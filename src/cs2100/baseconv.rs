@@ -135,7 +135,7 @@ fn bits_str(value: i128, bits: u32) -> String {
 }
 
 fn hex_str(value: i128, bits: u32) -> String {
-    let digits = (bits as usize + 3) / 4;
+    let digits = (bits as usize).div_ceil(4);
     format!(
         "0x{:0width$X}",
         (value as u128) & mask_of(bits),

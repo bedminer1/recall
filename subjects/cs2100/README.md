@@ -34,73 +34,115 @@ recall submit cs2100/a001 q7
 
 The attempt is written `subject/attempt-id` because every subject numbers its attempts from `a001` — with `cs4243` in the same repo, a bare `a001` is ambiguous and Recall will list the candidates instead of guessing.
 
-You get the verdict immediately:
+You get the verdict immediately, then just three numbers: your accuracy across cs2100, your accuracy on that quiz, and the LP left to your next rank.
 
 ```
-  ✅ q7   [medium]  +20 pts    🔥 streak 3
+  [+] q11  +20 LP
 
-  ███████░░░░░░░░░░░░░░░░░ 3/11   ⭐ 210 pts   🔥 streak 3   🏆 best 5
-  8 question(s) left in this attempt.
+  cs2100            82%  (9/11)   all quizzes
+  midterm-ay2425    82%  (9/11)   this quiz
+  Bronze IV        40 LP to Bronze III   (grade D+)
 ```
 
-Wrong answers print the explanation on the spot and reset the streak. You don't have to finish the attempt to bank the points — each resolved question is written to `progress.md` as soon as it's known.
+**A wrong answer is not final.** You get a nudge, not the answer:
+
+```
+  [~] q13  too low - your value is smaller than the answer.
+      edit it, then:  recall submit cs2100/a002 q13
+```
+
+Nudges are mechanical, so they never give the answer away: numbers get *too low* / *too high* / *so close, check your rounding*; short answers get *so close, check the formatting*, or on a third miss the length and first character; multi-part answers get *you have 2 of 3 required ideas*. Edit the response in the attempt file and submit again as many times as you like. A blank response isn't an attempt either, so leaving something unanswered costs nothing.
+
+If you're truly stuck, `recall giveup cs2100/a002 q13` shows the worked explanation and takes the miss.
 
 You can also grade several at once:
 
 ```sh
-recall submit cs2100/a001 q7 q8 q9      # just those three
-recall submit cs2100/a001               # whatever is still outstanding
+recall submit cs2100/a002 q11 q12 q13    # just those three
+recall submit cs2100/a002                # whatever is still outstanding
 ```
 
 ## Free-response questions
 
-Roughly two-thirds of the questions are free-response (tracing, derivations, explanations) — they can't be graded by string matching. Two ways to resolve them, both are per-question:
+Roughly two-thirds of the questions are free-response (tracing, derivations, explanations) — they can't be graded by string matching, so they don't get automatic nudges. Two ways through:
 
-**Self-check (fastest, no LLM round trip):**
+**Ask for a hint, not a verdict.** Ask Codex to check your answer using the Recall Coach skill. By default it replies with a pointer only ("you handled the exponent — what happens to the mantissa when you normalise?") and leaves the question open, so you can revise and ask again. Say you're done, or ask it to mark, when you want the verdict.
+
+**Self-check:**
 
 ```sh
-recall reveal cs2100/a001 q7            # shows your answer next to the model answer + reasoning
+recall reveal cs2100/a001 q7            # your answer next to the model answer + reasoning
 recall mark cs2100/a001 q7 correct      # or: incorrect
+recall mark cs2100/a001 q7 retry        # not good enough, but don't score it — try again
 ```
 
-`reveal` refuses to show anything until you've actually written a response, so it can't spoil an unanswered question.
+`reveal` refuses to show anything until you've actually written a response, so it can't spoil an unanswered question. Note that seeing the model answer ends the game for that question — `retry` is for when you want another go without peeking.
 
-**LLM marking:** ask Codex (in this repo) to mark that one question using the Recall Coach skill. It flips that question's result in the attempt file, then:
-
-```sh
-recall submit cs2100/a001 q7
-```
-
-Marking is honest either way — `recall mark` only records a verdict you chose, and nothing is scored twice.
+Marking is honest either way, and nothing is scored twice.
 
 ## Points and progress
 
-| Difficulty | Points |
-|---|---|
-| easy | 10 |
-| medium | 20 |
-| hard | 30 |
+Every correct answer earns **LP**, and LP is what sets your rank for that subject. The base is **15 easy / 20 medium / 30 hard**, and **every retry halves it, floored**:
 
-Only correct answers score. Consecutive correct answers build a streak (a wrong answer resets it, the best streak is remembered). Every 100 points is a level.
+| Difficulty | 1st try | 2nd try | 3rd try | 4th try | 5th try | miss |
+|---|---|---|---|---|---|---|
+| easy | +15 | +7 | +3 | +1 | 0 | -7 |
+| medium | +20 | +10 | +5 | +2 | +1 | -10 |
+| hard | +30 | +15 | +7 | +3 | +1 | -15 |
+
+A retry always beats giving up, but a miss costs half the question's value, so ranks can fall as well as rise.
+
+## Ranks
+
+Each subject has its own ladder, 40 LP per division. It runs the game's tiers, and the top of it is deliberately calibrated to the grades you want:
+
+```
+Iron IV .. Iron I          D
+Bronze IV .. Bronze I      D+
+Silver IV .. Silver I      C-
+Gold IV .. Gold I          C
+Platinum IV .. Platinum I  C+
+Emerald IV .. Emerald I    B-
+Diamond IV .. Diamond I    B
+Master                     A-
+Grandmaster                A
+Challenger                 A+
+```
+
+So **Master is A-, Grandmaster is A, Challenger is A+**. Crossing a boundary prints a banner, up or down:
+
+```
+  +==================================+
+  |          R A N K   U P           |
+  |       Silver I  ->  Gold IV      |
+  |       counts as grade C          |
+  +==================================+
+```
+
+Reaching Challenger takes about 1200 LP, and the three cs2100 quiz sets are worth 1440 LP if every answer is first try — so it is reachable, but only by actually knowing the material.
+
+The dashboard is deliberately just accuracy and rank, one subject at a time:
 
 ```sh
 recall
 ```
 
 ```
-cs2100: 18/30 correct   ⭐ 420 pts   level 5
-  easy   8/9
-  medium 7/14
-  hard   3/7
-  ████████████████░░░░ 20/100 to level 6
-  🔥 current streak 3   🏆 best 7
+Recall progress
+
+  cs2100            82%  (9/11)
+  Bronze IV        40 LP to Bronze III
+  cs4243            67%  (2/3)
+  Iron IV          15 LP to Iron III
 ```
+
+Set `NO_COLOR=1` if you want the output plain, and colours only appear on a terminal, never in a pipe or file.
 
 ## Accuracy notes
 
 Every machine-checkable value in the quizzes (encodings, decodings, byte layouts, branch offsets, trace results) was independently recomputed rather than trusted. The source notes themselves contain errors; the ones that matter are recorded in each notes file's "source issues" section, notably:
 
-- **Control:** this course's simplified processor supports only `add`, `sub`, `and`, `or`, `slt`, `beq`, `lw`, `sw`. There is **no `j` instruction and no `Jump` control signal** in the design, and the ALU selector is two bits named `ALUop1`/`ALUop0`. The source's "Supported Instructions" table also misprints `beq` as taking `$rd`.
+- **Control:** this course's simplified processor supports only `add`, `sub`, `and`, `or`, `slt`, `beq`, `lw`, `sw`. There is **no `j` instruction and no `Jump` control signal** in the design, and the ALU selector is two bits named `ALUop_1`/`ALUop_0`. The source's "Supported Instructions" table also misprints `beq` as taking `$rd`.
 - **Data representation:** the source's 4-bit **Excess-8 table is wrong** (its second column duplicates Excess-7); the corrected table is in the notes.
 - **MIPS:** the source prints `lw $t1,12($t0)` as `0x22D5FFCE`; the correct encoding is `0x8D09000C`. Several other source typos are listed there too.
 
@@ -118,6 +160,12 @@ recall baseconv -i bin "1010 1111"   # spaced binary with the base forced
 ```
 
 `-b N` is repeatable (1..=64). A non-negative value that fits in N bits is treated as a *pattern* and read back under all three signed schemes; a negative value is *encoded* under each scheme.
+
+## Notation
+
+Subscripts are always written with a leading underscore: `ALUop_1`/`ALUop_0`, `ALUcontrol_2`, `F_0`–`F_5`, `Op_5`–`Op_0`, `Ctrl_0`–`Ctrl_8`, `Operation_1`/`Operation_0`. Without the underscore these read as names rather than bit indices — `ALUop1` looks like "ALU operation 1" rather than "bit 1 of `ALUop`" — which is exactly what made parts of the control-unit material confusing.
+
+MIPS register *names* keep their normal spelling: `$t0`, `$s0`, `$v0`, `$r1`, and datapath labels such as `RR2`/`RD2`. Only genuine bit and field indices take the underscore.
 
 ## Rule that keeps the format working
 

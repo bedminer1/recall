@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io;
+use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -50,6 +51,7 @@ struct AttemptQuestion {
     difficulty: Difficulty,
     response: String,
     result: String,
+    tries: u32,
 }
 
 fn main() -> ExitCode {
@@ -86,6 +88,7 @@ fn run() -> AppResult<()> {
         [command, rest @ ..] if command == "submit" => submit_attempt(&find_root()?, rest),
         [command, rest @ ..] if command == "reveal" => reveal_question(&find_root()?, rest),
         [command, rest @ ..] if command == "mark" => mark_question(&find_root()?, rest),
+        [command, rest @ ..] if command == "giveup" => giveup_question(&find_root()?, rest),
         [command, rest @ ..] if command == "baseconv" => cs2100::baseconv::run(rest),
         _ => {
             print_help();
@@ -104,11 +107,16 @@ fn print_help() {
            recall start [quiz] [--take N]            new attempt (optionally N questions)\n\
            recall submit <attempt> [qid ...]         grade one question, or all of them\n\
            recall reveal <attempt> <qid>             show the model answer (self-check)\n\
-           recall mark <attempt> <qid> correct|incorrect\n\
+           recall mark <attempt> <qid> correct|incorrect|retry\n\
+           recall giveup <attempt> <qid>             show the answer and take the miss\n\
            recall baseconv <value> [-b N] [-i base]  CS2100 number conversions\n\
            recall                                    dashboard\n\n\
-         Every question is worth points: easy 10, medium 20, hard 30.\n\
-         Correct answers build a streak; wrong answers reset it.\n"
+         A wrong answer is not final: you get a nudge and another go.\n\
+         Correct answers earn LP (easy 15, medium 20, hard 30), halved\n\
+         and floored for each retry. A miss costs half, so ranks can fall\n\
+         as well as rise. LP per subject sets your rank:\n\
+           Iron - Bronze - Silver - Gold - Platinum - Emerald - Diamond\n\
+           Master (A-) - Grandmaster (A) - Challenger (A+)\n"
     );
 }
 
@@ -161,7 +169,7 @@ fn subject_add(raw_subject: &str) -> AppResult<()> {
     if !progress.exists() {
         fs::write(
             &progress,
-            "# Progress\n\n| date | attempt | question | difficulty | result |\n|---|---|---|---|---|\n",
+            "# Progress\n\n| date | attempt | question | difficulty | result | tries |\n|---|---|---|---|---|---|\n",
         )
         .map_err(io_error)?;
     }
@@ -262,13 +270,13 @@ fn start_attempt(root: &Path, query: Option<&str>, take: Option<usize>) -> AppRe
     );
     for (_, question) in &questions {
         output.push_str(&format!(
-            "{}\n\n{}\n\n<!-- response:start -->\n\n<!-- response:end -->\n<!-- result: pending -->\n<!-- feedback:start -->\n\n<!-- feedback:end -->\n\n",
+            "{}\n\n{}\n\n<!-- response:start -->\n\n<!-- response:end -->\n<!-- result: pending -->\n<!-- tries: 0 -->\n<!-- feedback:start -->\n\n<!-- feedback:end -->\n\n",
             question.heading,
             question.prompt.trim()
         ));
     }
     fs::write(&attempt_path, output).map_err(io_error)?;
-    println!("Attempt `{attempt_id}` is ready — {drawn} question(s).");
+    println!("Attempt `{attempt_id}` is ready - {drawn} question(s).");
     if drawn < available {
         println!(
             "Drew {drawn} at random from {available} in `{}`.",
@@ -337,6 +345,7 @@ fn submit_attempt(root: &Path, args: &[String]) -> AppResult<()> {
     };
 
     let mut waiting = Vec::new();
+    let mut empty = Vec::new();
     for id in &targets {
         let question = quiz
             .iter()
@@ -348,23 +357,38 @@ fn submit_attempt(root: &Path, args: &[String]) -> AppResult<()> {
             .find(|candidate| &candidate.id == id)
             .expect("targets come from the attempt");
 
-        if rule == "manual" {
-            if attempted_question.result != "correct" && attempted_question.result != "incorrect" {
-                waiting.push(id.clone());
-            }
+        // Already settled questions are never re-graded, so a give-up or an
+        // LLM verdict cannot be overwritten by a later submit.
+        if is_resolved(attempted_question) {
             continue;
         }
 
-        let correct = grade_automatic(&question.answer, &attempted_question.response)?;
-        attempted_question.result = if correct { "correct" } else { "incorrect" }.to_string();
-        replace_question_marker(&mut attempt_text, id, "result", &attempted_question.result)?;
-        if !correct && !question.explanation.trim().is_empty() {
-            replace_question_block(
-                &mut attempt_text,
-                id,
-                "feedback",
-                question.explanation.trim(),
-            )?;
+        // A blank response is not a wrong answer; it is simply not an attempt yet.
+        if attempted_question.response.trim().is_empty() {
+            empty.push(id.clone());
+            continue;
+        }
+
+        if rule == "manual" {
+            waiting.push(id.clone());
+            continue;
+        }
+
+        attempted_question.tries += 1;
+        let tries = attempted_question.tries;
+        upsert_question_marker(&mut attempt_text, id, "tries", &tries.to_string())?;
+
+        if grade_automatic(&question.answer, &attempted_question.response)? {
+            attempted_question.result = "correct".to_string();
+            replace_question_marker(&mut attempt_text, id, "result", "correct")?;
+            replace_question_block(&mut attempt_text, id, "feedback", "")?;
+        } else {
+            // Wrong is not final: park the question in `retry`, keep the streak
+            // alive, and leave a nudge instead of the answer.
+            attempted_question.result = "retry".to_string();
+            replace_question_marker(&mut attempt_text, id, "result", "retry")?;
+            let hint = hint_for(&question.answer, &attempted_question.response, tries);
+            replace_question_block(&mut attempt_text, id, "feedback", &hint)?;
         }
     }
 
@@ -372,7 +396,7 @@ fn submit_attempt(root: &Path, args: &[String]) -> AppResult<()> {
     let mut resolved = Vec::new();
     for id in &targets {
         if let Some(question) = attempted.iter().find(|question| &question.id == id)
-            && (question.result == "correct" || question.result == "incorrect")
+            && is_resolved(question)
             && !already_scored(id)
         {
             resolved.push(ProgressRow {
@@ -380,6 +404,7 @@ fn submit_attempt(root: &Path, args: &[String]) -> AppResult<()> {
                 question: question.id.clone(),
                 difficulty: question.difficulty,
                 result: question.result.clone(),
+                tries: question.tries,
             });
         }
     }
@@ -403,6 +428,18 @@ fn submit_attempt(root: &Path, args: &[String]) -> AppResult<()> {
     // Suggestions must be unambiguous: every subject numbers its attempts from
     // a001, so always show the subject-qualified name in commands we print.
     let attempt_ref = format!("{subject}/{attempt_id}");
+    let quiz_stem = quiz_stem_of(&quiz_relative);
+    let quiz_map = quizzes_by_attempt(root, &subject)?;
+    let summary = Summary {
+        subject: subject.clone(),
+        subject_accuracy: accuracy_of(final_history.iter()),
+        quiz_accuracy: accuracy_of(
+            final_history
+                .iter()
+                .filter(|row| quiz_map.get(&row.attempt).map(String::as_str) == Some(&quiz_stem)),
+        ),
+        quiz: quiz_stem,
+    };
     report(
         &attempt_id,
         &attempt_ref,
@@ -411,14 +448,24 @@ fn submit_attempt(root: &Path, args: &[String]) -> AppResult<()> {
         &attempted,
         &resolved,
         &waiting,
+        &empty,
         &history,
         &final_history,
         complete,
+        &summary,
     );
     Ok(())
 }
 
-/// Print the per-question verdicts, the progress bar, points and streak.
+/// The two accuracies worth showing: the whole subject, and the quiz in hand.
+struct Summary {
+    subject: String,
+    subject_accuracy: Accuracy,
+    quiz: String,
+    quiz_accuracy: Accuracy,
+}
+
+/// Print the per-question verdicts, the two accuracies, and the LP to next rank.
 #[allow(clippy::too_many_arguments)]
 fn report(
     attempt_id: &str,
@@ -428,70 +475,103 @@ fn report(
     attempted: &[AttemptQuestion],
     resolved: &[ProgressRow],
     waiting: &[String],
+    empty: &[String],
     history: &[ProgressRow],
     final_history: &[ProgressRow],
     complete: bool,
+    summary: &Summary,
 ) {
-    let mut streak = current_streak(history);
-    let total = total_points(final_history);
-    let mut run_points = 0_u32;
-    let mut run_correct = 0_usize;
-    let mut run_wrong = 0_usize;
+    let lp = total_lp(final_history);
+    let rank = rank_for(lp);
+    let rank_before = rank_for(total_lp(history));
+    let mut run_retry = 0_usize;
 
     println!();
     for id in targets {
         let Some(question) = attempted.iter().find(|question| &question.id == id) else {
             continue;
         };
-        let difficulty = question.difficulty.as_str();
-        if waiting.contains(id) {
-            println!("  ⏳ {id:<4} [{difficulty}]  free-response, not marked yet");
+        let explanation = quiz
+            .iter()
+            .find(|source| source.id == *id)
+            .map(|source| source.explanation.trim())
+            .unwrap_or_default();
+
+        if empty.contains(id) {
+            println!("  [ ] {id}  no answer written yet");
             continue;
         }
-        match resolved.iter().find(|row| &row.question == id) {
-            Some(row) if row.result == "correct" => {
-                streak += 1;
-                let points = base_points(row.difficulty);
-                run_points += points;
-                run_correct += 1;
-                println!("  ✅ {id:<4} [{difficulty}]  +{points} pts    🔥 streak {streak}");
-            }
-            Some(_) => {
-                streak = 0;
-                run_wrong += 1;
-                println!("  ❌ {id:<4} [{difficulty}]  +0 pts    streak reset");
-                let explanation = quiz
-                    .iter()
-                    .find(|source| source.id == *id)
-                    .map(|source| source.explanation.trim())
-                    .unwrap_or_default();
+
+        if let Some(row) = resolved.iter().find(|row| &row.question == id) {
+            let delta = lp_delta(row);
+            if row.result == "correct" {
+                let tries = if row.tries > 1 {
+                    format!("   (try {})", row.tries)
+                } else {
+                    String::new()
+                };
+                println!("  [+] {id}  +{delta} LP{tries}");
+            } else {
+                println!("  [-] {id}  {delta} LP");
                 for line in explanation.lines().filter(|line| !line.trim().is_empty()) {
-                    println!("       {line}");
+                    println!("      {line}");
                 }
             }
-            None => println!(
-                "  •  {id:<4} [{difficulty}]  already scored ({})",
-                question.result
-            ),
+            continue;
+        }
+
+        match question.result.as_str() {
+            "retry" => {
+                run_retry += 1;
+                let hint = quiz
+                    .iter()
+                    .find(|source| source.id == *id)
+                    .map(|source| hint_for(&source.answer, &question.response, question.tries))
+                    .unwrap_or_default();
+                println!("  [~] {id}  {hint}");
+                if question.tries >= 3 {
+                    println!("      answer + take the miss:  recall giveup {attempt_ref} {id}");
+                } else {
+                    println!("      edit it, then:  recall submit {attempt_ref} {id}");
+                }
+            }
+            "pending" => println!("  [ ] {id}  awaiting a mark"),
+            other => println!("  [.] {id}  already scored ({other})"),
         }
     }
 
-    // Count banked questions, not merely resolved ones, so the bar agrees with
-    // the points and streak sitting next to it on the same line.
     let done = final_history
         .iter()
         .filter(|row| row.attempt == attempt_id)
         .count();
     let total_questions = attempted.len();
+    let next = rank_for(lp + (LP_PER_STEP - rank.lp));
+
     println!();
     println!(
-        "  {} {done}/{total_questions}   ⭐ {total} pts   🔥 streak {streak}   🏆 best {}",
-        progress_bar(done, total_questions, 24),
-        best_streak(final_history)
+        "  {:<16} {:>3}%  ({}/{})   all quizzes",
+        summary.subject,
+        summary.subject_accuracy.percent(),
+        summary.subject_accuracy.correct,
+        summary.subject_accuracy.total
+    );
+    println!(
+        "  {:<16} {:>3}%  ({}/{})   this quiz",
+        summary.quiz,
+        summary.quiz_accuracy.percent(),
+        summary.quiz_accuracy.correct,
+        summary.quiz_accuracy.total
+    );
+    println!(
+        "  {} {} LP to {}   (grade {})",
+        paint(&format!("{:<16}", rank.label()), rank.color()),
+        LP_PER_STEP - rank.lp,
+        next.label(),
+        rank.grade
     );
 
-    if targets.len() > 1 && run_correct + run_wrong > 0 {
-        println!("  this run: +{run_points} pts · {run_correct} correct · {run_wrong} missed");
+    if rank.step != rank_before.step {
+        rank_change_banner(&rank_before, &rank);
     }
 
     if complete {
@@ -500,25 +580,21 @@ fn report(
             .filter(|question| question.result == "correct")
             .count();
         println!();
-        println!("  🎉 attempt `{attempt_id}` complete — {correct}/{total_questions} correct");
-        print_counts(attempted);
-        let (level, into, need) = level_for(total);
-        println!(
-            "  level {level}  {} {into}/{need} pts to level {}",
-            progress_bar(into as usize, need as usize, 20),
-            level + 1
-        );
+        println!("  attempt `{attempt_id}` complete - {correct}/{total_questions} correct");
+    } else if run_retry > 0 {
+        println!();
+        println!("  {run_retry} still open - retrying always beats giving up.");
     } else if !waiting.is_empty() {
         println!();
-        println!("  {} unmarked: {}", waiting.len(), waiting.join(", "));
         println!(
-            "  mark them, then:  recall submit {attempt_ref} {}",
-            waiting[0]
+            "  {} awaiting a mark: {}",
+            waiting.len(),
+            waiting.join(", ")
         );
+        println!("  answer:  recall reveal {attempt_ref} {}", waiting[0]);
     } else if done < total_questions {
         println!();
-        println!("  {done}/{total_questions} banked. Record the rest from the file with:");
-        println!("    recall submit {attempt_ref}");
+        println!("  {done}/{total_questions} banked - recall submit {attempt_ref} for the rest");
     }
 }
 
@@ -532,7 +608,7 @@ struct AttemptView {
 }
 
 impl AttemptView {
-    /// `subject/attempt-id` — unambiguous across subjects in printed commands.
+    /// `subject/attempt-id` - unambiguous across subjects in printed commands.
     fn reference(&self) -> String {
         format!("{}/{}", self.subject, self.attempt_id)
     }
@@ -592,13 +668,13 @@ fn reveal_question(root: &Path, args: &[String]) -> AppResult<()> {
     // Don't leak the answer to a question that has not been attempted yet.
     if attempted.response.trim().is_empty() && !is_resolved(attempted) {
         return Err(format!(
-            "`{id}` has no answer yet — write your response in the attempt file first"
+            "`{id}` has no answer yet - write your response in the attempt file first"
         ));
     }
 
     let rule = question.answer.lines().next().unwrap_or("manual").trim();
     println!();
-    println!("  ── {id} [{}] ──", attempted.difficulty.as_str());
+    println!("  -- {id} [{}] --", attempted.difficulty.as_str());
     println!();
     for line in question.prompt.lines() {
         println!("  {line}");
@@ -652,14 +728,16 @@ fn reveal_question(root: &Path, args: &[String]) -> AppResult<()> {
 /// Record a self-assessment for a free-response question.
 fn mark_question(root: &Path, args: &[String]) -> AppResult<()> {
     if args.len() != 3 {
-        return Err("usage: recall mark <attempt> <question-id> correct|incorrect".into());
+        return Err("usage: recall mark <attempt> <question-id> correct|incorrect|retry".into());
     }
     let verdict = match args[2].trim().to_ascii_lowercase().as_str() {
         "correct" | "c" | "yes" | "y" | "right" | "1" => "correct",
         "incorrect" | "wrong" | "no" | "n" | "0" => "incorrect",
+        // Not a miss: park it and let them have another go.
+        "retry" | "again" | "r" => "retry",
         other => {
             return Err(format!(
-                "`{other}` is not a verdict; use correct or incorrect"
+                "`{other}` is not a verdict; use correct, incorrect or retry"
             ));
         }
     };
@@ -677,16 +755,70 @@ fn mark_question(root: &Path, args: &[String]) -> AppResult<()> {
     }
     if attempted.response.trim().is_empty() {
         return Err(format!(
-            "`{}` has no response yet — answer it in the attempt file first",
+            "`{}` has no response yet - answer it in the attempt file first",
+            question.id
+        ));
+    }
+    if is_resolved(attempted) {
+        return Err(format!(
+            "`{}` is already settled as `{}` - start a fresh attempt to try it again",
+            question.id, attempted.result
+        ));
+    }
+
+    let tries = attempted.tries + 1;
+    let mut text = fs::read_to_string(&view.path).map_err(io_error)?;
+    upsert_question_marker(&mut text, &question.id, "tries", &tries.to_string())?;
+    upsert_question_marker(&mut text, &question.id, "result", verdict)?;
+    if verdict == "retry" {
+        replace_question_block(
+            &mut text,
+            &question.id,
+            "feedback",
+            "Marked for another go - revise your response and mark it again.",
+        )?;
+        fs::write(&view.path, text).map_err(io_error)?;
+        println!("  [~] {} parked for another attempt.", question.id);
+        return Ok(());
+    }
+    fs::write(&view.path, text).map_err(io_error)?;
+
+    // Hand off to the normal submit path so scoring lives in one place.
+    submit_attempt(root, &[args[0].clone(), args[1].clone()])
+}
+
+/// Show the answer and take the miss, ending a question's retries.
+fn giveup_question(root: &Path, args: &[String]) -> AppResult<()> {
+    if args.len() != 2 {
+        return Err("usage: recall giveup <attempt> <question-id>".into());
+    }
+    let view = load_attempt(root, &args[0])?;
+    let (question, attempted) = index_question(&view, &args[1])?;
+    if is_resolved(attempted) {
+        return Err(format!(
+            "`{}` is already settled as `{}`",
+            question.id, attempted.result
+        ));
+    }
+    if attempted.response.trim().is_empty() {
+        return Err(format!(
+            "`{}` has no response yet - nothing to give up on",
             question.id
         ));
     }
 
     let mut text = fs::read_to_string(&view.path).map_err(io_error)?;
-    replace_question_marker(&mut text, &question.id, "result", verdict)?;
+    upsert_question_marker(&mut text, &question.id, "result", "incorrect")?;
+    replace_question_block(
+        &mut text,
+        &question.id,
+        "feedback",
+        question.explanation.trim(),
+    )?;
     fs::write(&view.path, text).map_err(io_error)?;
 
-    // Hand off to the normal submit path so scoring lives in one place.
+    println!("  answer revealed - reading it is worth more than the LP.");
+    // Hand off to the normal submit path so the miss is recorded in one place.
     submit_attempt(root, &[args[0].clone(), args[1].clone()])
 }
 
@@ -709,34 +841,23 @@ fn dashboard(root: &Path) -> AppResult<()> {
         }
         let subject = entry.file_name().to_string_lossy().into_owned();
         let rows = read_progress_rows(&entry.path().join("progress.md"))?;
-        let total = rows.len();
-        let correct = rows.iter().filter(|row| row.result == "correct").count();
-        let points = total_points(&rows);
-        let (level, into, need) = level_for(points);
-        println!("{subject}: {correct}/{total} correct   ⭐ {points} pts   level {level}");
-        for difficulty in [Difficulty::Easy, Difficulty::Medium, Difficulty::Hard] {
-            let matching: Vec<_> = rows
-                .iter()
-                .filter(|row| row.difficulty == difficulty)
-                .collect();
-            let solved = matching
-                .iter()
-                .filter(|row| row.result == "correct")
-                .count();
-            println!("  {:6} {solved}/{}", difficulty.as_str(), matching.len());
-        }
+        let accuracy = accuracy_of(rows.iter());
+        let lp = total_lp(&rows);
+        let rank = rank_for(lp);
+        let next = rank_for(lp + (LP_PER_STEP - rank.lp));
         println!(
-            "  {} {into}/{need} to level {}",
-            progress_bar(into as usize, need as usize, 20),
-            level + 1
+            "  {:<16} {:>3}%  ({}/{})",
+            subject,
+            accuracy.percent(),
+            accuracy.correct,
+            accuracy.total
         );
-        let streak = current_streak(&rows);
-        if streak > 0 {
-            println!(
-                "  🔥 current streak {streak}   🏆 best {}",
-                best_streak(&rows)
-            );
-        }
+        println!(
+            "  {} {} LP to {}",
+            paint(&format!("{:<16}", rank.label()), rank.color()),
+            LP_PER_STEP - rank.lp,
+            next.label()
+        );
     }
     Ok(())
 }
@@ -776,11 +897,15 @@ fn parse_attempt(text: &str) -> AppResult<Vec<AttemptQuestion>> {
         let response = extract_block(&body, "response")
             .ok_or_else(|| format!("question `{id}` is missing response markers"))?;
         let result = marker_value(&body, "result").unwrap_or_else(|| "pending".into());
+        let tries = marker_value(&body, "tries")
+            .and_then(|value| value.trim().parse::<u32>().ok())
+            .unwrap_or(0);
         output.push(AttemptQuestion {
             id,
             difficulty,
             response,
             result,
+            tries,
         });
     }
     Ok(output)
@@ -869,6 +994,89 @@ fn grade_automatic(answer_block: &str, response: &str) -> AppResult<bool> {
     }
 }
 
+/// A nudge that points at the mistake without handing over the answer.
+///
+/// The hint gets more specific as `tries` grows, so a wrong answer invites
+/// another attempt instead of ending the question.
+fn hint_for(answer_block: &str, response: &str, tries: u32) -> String {
+    let mut lines = answer_block.lines();
+    let rule = lines.next().unwrap_or("manual").trim();
+    let expected: Vec<String> = lines
+        .map(|line| line.trim().to_string())
+        .filter(|line| !line.is_empty())
+        .collect();
+    let actual = normalize(response);
+
+    match rule {
+        "exact" => {
+            let squash = |value: &str| {
+                value
+                    .to_ascii_lowercase()
+                    .chars()
+                    .filter(char::is_ascii_alphanumeric)
+                    .collect::<String>()
+            };
+            if expected
+                .iter()
+                .any(|value| squash(value) == squash(&actual))
+            {
+                return "so close - the content is right but the formatting is not. Check spacing, capitals or separators.".into();
+            }
+            if tries >= 3
+                && let Some(first) = expected.first()
+            {
+                let head = first.chars().next().unwrap_or('?');
+                return format!(
+                    "still not it - the answer is {} characters long and starts with `{head}`.",
+                    first.chars().count()
+                );
+            }
+            if tries >= 2 {
+                return "not it yet - compare your answer against what the question actually asks for. The form matters as much as the value.".into();
+            }
+            "not it yet - re-read the question, fix your response and submit again.".into()
+        }
+        "contains" => {
+            let have = expected
+                .iter()
+                .filter(|value| actual.contains(&normalize(value)))
+                .count();
+            if have == 0 {
+                "none of the required ideas are in your answer yet - the concept may be off entirely.".into()
+            } else {
+                format!(
+                    "you have {have} of {} required ideas. Which one is missing?",
+                    expected.len()
+                )
+            }
+        }
+        _ if rule.starts_with("numeric") => {
+            let tolerance = rule
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or("0")
+                .parse::<f64>()
+                .unwrap_or(0.0);
+            let Some(target) = expected.first().and_then(|value| value.parse::<f64>().ok()) else {
+                return "not it yet - try again.".into();
+            };
+            let Ok(value) = response.trim().parse::<f64>() else {
+                return "that is not a number - write the value as a plain number, then submit again."
+                    .into();
+            };
+            if (value - target).abs() <= tolerance.max(0.0) * 3.0 {
+                return "so close - check your rounding or the last digit.".into();
+            }
+            if value < target {
+                "too low - your value is smaller than the answer.".into()
+            } else {
+                "too high - your value is larger than the answer.".into()
+            }
+        }
+        _ => "not it yet - try again.".into(),
+    }
+}
+
 fn normalize(value: &str) -> String {
     value
         .split_whitespace()
@@ -928,6 +1136,27 @@ fn replace_question_marker(text: &mut String, id: &str, name: &str, value: &str)
     Ok(())
 }
 
+/// Set a per-question marker, inserting it when the attempt predates it.
+///
+/// Attempts written before the `tries` marker existed are still valid work in
+/// progress, so a missing marker must never make them unusable.
+fn upsert_question_marker(text: &mut String, id: &str, name: &str, value: &str) -> AppResult<()> {
+    let (start, end) = question_range(text, id)?;
+    let mut block = text[start..end].to_string();
+    if block.contains(&format!("<!-- {name}:")) {
+        replace_global_marker(&mut block, name, value)?;
+    } else {
+        // Slot it in after the result marker so the block keeps its shape.
+        let position = block
+            .find("<!-- result:")
+            .and_then(|offset| block[offset..].find("-->").map(|tail| offset + tail + 3))
+            .unwrap_or(block.len());
+        block.insert_str(position, &format!("\n<!-- {name}: {value} -->"));
+    }
+    text.replace_range(start..end, &block);
+    Ok(())
+}
+
 fn replace_question_block(text: &mut String, id: &str, name: &str, value: &str) -> AppResult<()> {
     let (start, end) = question_range(text, id)?;
     let mut block = text[start..end].to_string();
@@ -953,6 +1182,7 @@ struct ProgressRow {
     question: String,
     difficulty: Difficulty,
     result: String,
+    tries: u32,
 }
 
 fn append_progress_rows(path: &Path, rows: &[ProgressRow]) -> AppResult<()> {
@@ -962,17 +1192,18 @@ fn append_progress_rows(path: &Path, rows: &[ProgressRow]) -> AppResult<()> {
     let mut text = if path.exists() {
         fs::read_to_string(path).map_err(io_error)?
     } else {
-        "# Progress\n\n| date | attempt | question | difficulty | result |\n|---|---|---|---|---|\n"
+        "# Progress\n\n| date | attempt | question | difficulty | result | tries |\n|---|---|---|---|---|---|\n"
             .to_string()
     };
     let date = unix_timestamp().to_string();
     for row in rows {
         text.push_str(&format!(
-            "| {date} | {} | {} | {} | {} |\n",
+            "| {date} | {} | {} | {} | {} | {} |\n",
             row.attempt,
             row.question,
             row.difficulty.as_str(),
-            row.result
+            row.result,
+            row.tries
         ));
     }
     fs::write(path, text).map_err(io_error)
@@ -989,68 +1220,260 @@ fn read_progress_rows(path: &Path) -> AppResult<Vec<ProgressRow>> {
         if fields.len() >= 7
             && let Some(difficulty) = Difficulty::parse(fields[4])
         {
+            // Rows written before retries existed have no tries column.
+            let tries = fields
+                .get(6)
+                .and_then(|value| value.parse::<u32>().ok())
+                .unwrap_or(1);
             rows.push(ProgressRow {
                 attempt: fields[2].to_string(),
                 question: fields[3].to_string(),
                 difficulty,
                 result: fields[5].to_string(),
+                tries,
             });
         }
     }
     Ok(rows)
 }
 
-/// Points for a correct answer, weighted by difficulty.
+/// Full points for a first-try correct answer, weighted by difficulty.
 fn base_points(difficulty: Difficulty) -> u32 {
     match difficulty {
-        Difficulty::Easy => 10,
+        Difficulty::Easy => 15,
         Difficulty::Medium => 20,
         Difficulty::Hard => 30,
     }
 }
 
-fn total_points(rows: &[ProgressRow]) -> u32 {
-    rows.iter()
-        .filter(|row| row.result == "correct")
-        .map(|row| base_points(row.difficulty))
-        .sum()
+/// Points for a correct answer: the base, halved and floored for every extra try.
+///
+/// So 20 becomes 20, 10, 5, 2, 1 across four retries. Retrying is never
+/// punished to zero, because redeeming yourself should always beat giving up.
+fn points_for(difficulty: Difficulty, result: &str, tries: u32) -> u32 {
+    if result != "correct" {
+        return 0;
+    }
+    let mut points = base_points(difficulty);
+    for _ in 1..tries.max(1) {
+        if points <= 1 {
+            return 0;
+        }
+        points /= 2;
+    }
+    points
 }
 
-/// Correct answers at the very end of the history.
-fn current_streak(rows: &[ProgressRow]) -> u32 {
-    rows.iter()
-        .rev()
-        .take_while(|row| row.result == "correct")
-        .count() as u32
+// ---------------------------------------------------------------- ranked play
+
+/// League Points needed to move up one division (or one step above Diamond).
+const LP_PER_STEP: i64 = 40;
+
+/// Tiers that have four divisions each, lowest first.
+const DIVISION_TIERS: [&str; 7] = [
+    "Iron", "Bronze", "Silver", "Gold", "Platinum", "Emerald", "Diamond",
+];
+
+/// Number of divisions below Master (7 tiers x 4 divisions).
+const DIVISION_STEPS: u32 = 28;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Rank {
+    tier: &'static str,
+    division: Option<u32>,
+    /// League Points earned inside the current division.
+    lp: i64,
+    /// Position on the ladder, so promotions and demotions compare cleanly.
+    step: u32,
+    /// The course grade this rank is meant to correspond to.
+    grade: &'static str,
 }
 
-fn best_streak(rows: &[ProgressRow]) -> u32 {
-    let mut best = 0;
-    let mut run = 0;
-    for row in rows {
-        if row.result == "correct" {
-            run += 1;
-            best = best.max(run);
-        } else {
-            run = 0;
+impl Rank {
+    fn label(&self) -> String {
+        match self.division {
+            Some(division) => format!("{} {}", self.tier, roman(division)),
+            None => self.tier.to_string(),
         }
     }
-    best
-}
 
-/// 100 points per level: (current level, points into it, points needed).
-fn level_for(points: u32) -> (u32, u32, u32) {
-    (points / 100 + 1, points % 100, 100)
-}
-
-fn progress_bar(done: usize, total: usize, width: usize) -> String {
-    let filled = if total == 0 {
-        0
-    } else {
-        (done * width + total / 2) / total
+    /// Roughly the tier's colour in the game.
+    fn color(&self) -> &'static str {
+        match self.tier {
+            "Iron" => "38;5;245",
+            "Bronze" => "38;5;130",
+            "Silver" => "38;5;250",
+            "Gold" => "38;5;220",
+            "Platinum" => "38;5;44",
+            "Emerald" => "38;5;41",
+            "Diamond" => "38;5;39",
+            "Master" => "38;5;135",
+            "Grandmaster" => "38;5;160",
+            _ => "38;5;51",
+        }
     }
-    .min(width);
-    format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
+}
+
+fn roman(division: u32) -> &'static str {
+    match division {
+        1 => "I",
+        2 => "II",
+        3 => "III",
+        _ => "IV",
+    }
+}
+
+fn tier_grade(tier: &str) -> &'static str {
+    match tier {
+        "Iron" => "D",
+        "Bronze" => "D+",
+        "Silver" => "C-",
+        "Gold" => "C",
+        "Platinum" => "C+",
+        "Emerald" => "B-",
+        "Diamond" => "B",
+        "Master" => "A-",
+        "Grandmaster" => "A",
+        _ => "A+",
+    }
+}
+
+/// Rank for a signed LP total. LP floors at zero, so Iron IV is rock bottom.
+fn rank_for(total_lp: i64) -> Rank {
+    let clamped = total_lp.max(0);
+    let step = (clamped / LP_PER_STEP) as u32;
+    let lp = clamped % LP_PER_STEP;
+    if step < DIVISION_STEPS {
+        let tier = DIVISION_TIERS[(step / 4) as usize];
+        return Rank {
+            tier,
+            division: Some(4 - step % 4),
+            lp,
+            step,
+            grade: tier_grade(tier),
+        };
+    }
+    let tier = match step - DIVISION_STEPS {
+        0 => "Master",
+        1 => "Grandmaster",
+        _ => "Challenger",
+    };
+    Rank {
+        tier,
+        division: None,
+        lp,
+        step,
+        grade: tier_grade(tier),
+    }
+}
+
+/// Signed LP change for one scored question.
+///
+/// A miss costs half the question's value, which is what lets a rank fall as
+/// well as rise; a retry costs nothing but pays less.
+fn lp_delta(row: &ProgressRow) -> i64 {
+    match row.result.as_str() {
+        "correct" => i64::from(points_for(row.difficulty, "correct", row.tries)),
+        "incorrect" => -i64::from(base_points(row.difficulty)) / 2,
+        _ => 0,
+    }
+}
+
+fn total_lp(rows: &[ProgressRow]) -> i64 {
+    rows.iter().map(lp_delta).sum()
+}
+
+/// Correct-out-of-total for one scope: a whole subject, or a single quiz.
+#[derive(Debug, Clone, Copy, Default)]
+struct Accuracy {
+    correct: usize,
+    total: usize,
+}
+
+impl Accuracy {
+    fn percent(&self) -> u32 {
+        if self.total == 0 {
+            0
+        } else {
+            ((self.correct * 100 + self.total / 2) / self.total) as u32
+        }
+    }
+}
+
+fn accuracy_of<'a>(rows: impl Iterator<Item = &'a ProgressRow>) -> Accuracy {
+    let mut accuracy = Accuracy::default();
+    for row in rows {
+        accuracy.total += 1;
+        if row.result == "correct" {
+            accuracy.correct += 1;
+        }
+    }
+    accuracy
+}
+
+fn quiz_stem_of(quiz_relative: &str) -> String {
+    Path::new(quiz_relative)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or(quiz_relative)
+        .to_string()
+}
+
+/// Map every attempt to the quiz it came from, so history can be read per quiz.
+fn quizzes_by_attempt(root: &Path, subject: &str) -> AppResult<HashMap<String, String>> {
+    let mut map = HashMap::new();
+    let attempts = root.join("subjects").join(subject).join("attempts");
+    if !attempts.is_dir() {
+        return Ok(map);
+    }
+    for entry in fs::read_dir(&attempts).map_err(io_error)? {
+        let path = entry.map_err(io_error)?.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("md") {
+            continue;
+        }
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        if let (Some(attempt), Some(quiz)) = (
+            marker_value(&text, "attempt-id"),
+            marker_value(&text, "source-quiz"),
+        ) {
+            map.insert(attempt, quiz_stem_of(&quiz));
+        }
+    }
+    Ok(map)
+}
+
+fn color_enabled() -> bool {
+    env::var_os("NO_COLOR").is_none() && io::stdout().is_terminal()
+}
+
+fn paint(text: &str, code: &str) -> String {
+    if color_enabled() {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    } else {
+        text.to_string()
+    }
+}
+
+/// ASCII banner shown when a rank changes, in the new tier's colour.
+fn rank_change_banner(before: &Rank, after: &Rank) {
+    let promoted = after.step > before.step;
+    let (title, colour) = if promoted {
+        ("R A N K   U P", after.color())
+    } else {
+        ("R A N K   D O W N", "38;5;160")
+    };
+    let movement = format!("{}  ->  {}", before.label(), after.label());
+    let line = "=".repeat(34);
+    println!();
+    println!("  +{line}+");
+    println!("  |{:^34}|", "");
+    println!("  |{}|", paint(&format!("{title:^34}"), colour));
+    println!("  |{}|", paint(&format!("{movement:^34}"), colour));
+    println!("  |{:^34}|", format!("counts as grade {}", after.grade));
+    println!("  |{:^34}|", "");
+    println!("  +{line}+");
 }
 
 /// Fisher-Yates with a small LCG, keeping the crate dependency-free.
@@ -1070,20 +1493,6 @@ fn random_seed() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| (duration.as_secs() << 20) ^ u64::from(duration.subsec_nanos()))
         .unwrap_or(0x5EED)
-}
-
-fn print_counts(questions: &[AttemptQuestion]) {
-    for difficulty in [Difficulty::Easy, Difficulty::Medium, Difficulty::Hard] {
-        let matching: Vec<_> = questions
-            .iter()
-            .filter(|question| question.difficulty == difficulty)
-            .collect();
-        let correct = matching
-            .iter()
-            .filter(|question| question.result == "correct")
-            .count();
-        println!("  {:6}: {correct}/{}", difficulty.as_str(), matching.len());
-    }
 }
 
 fn collect_markdown(root: &Path, folder: &str) -> AppResult<Vec<PathBuf>> {
@@ -1268,56 +1677,183 @@ mod tests {
     }
 
     fn row(question: &str, difficulty: Difficulty, result: &str) -> ProgressRow {
+        row_tries(question, difficulty, result, 1)
+    }
+
+    fn row_tries(question: &str, difficulty: Difficulty, result: &str, tries: u32) -> ProgressRow {
         ProgressRow {
             attempt: "a001".into(),
             question: question.into(),
             difficulty,
             result: result.into(),
+            tries,
         }
     }
 
     #[test]
+    fn each_retry_halves_the_points_and_floors() {
+        // medium is 20, then 10, 5, 2, 1, then nothing left to halve
+        let medium: Vec<u32> = (1..=6)
+            .map(|tries| points_for(Difficulty::Medium, "correct", tries))
+            .collect();
+        assert_eq!(medium, vec![20, 10, 5, 2, 1, 0]);
+        // easy is 15, so the floor bites one step sooner
+        let easy: Vec<u32> = (1..=4)
+            .map(|tries| points_for(Difficulty::Easy, "correct", tries))
+            .collect();
+        assert_eq!(easy, vec![15, 7, 3, 1]);
+        // hard is 30
+        let hard: Vec<u32> = (1..=4)
+            .map(|tries| points_for(Difficulty::Hard, "correct", tries))
+            .collect();
+        assert_eq!(hard, vec![30, 15, 7, 3]);
+        // a miss is always worth nothing, however many tries it took
+        assert_eq!(points_for(Difficulty::Hard, "incorrect", 1), 0);
+        assert_eq!(points_for(Difficulty::Hard, "incorrect", 4), 0);
+    }
+
+    #[test]
+    fn rank_ladder_maps_to_grades() {
+        // Iron IV is the floor
+        assert_eq!(rank_for(-500).label(), "Iron IV");
+        assert_eq!(rank_for(0).grade, "D");
+        // one step is 40 LP, four steps is a whole tier
+        assert_eq!(rank_for(39).label(), "Iron IV");
+        assert_eq!(rank_for(40).label(), "Iron III");
+        assert_eq!(rank_for(119).label(), "Iron II");
+        assert_eq!(rank_for(120).label(), "Iron I");
+        assert_eq!(rank_for(160).label(), "Bronze IV");
+        // the grades the student actually cares about
+        let master = rank_for(DIVISION_STEPS as i64 * LP_PER_STEP);
+        assert_eq!((master.label().as_str(), master.grade), ("Master", "A-"));
+        let gm = rank_for((DIVISION_STEPS as i64 + 1) * LP_PER_STEP);
+        assert_eq!((gm.label().as_str(), gm.grade), ("Grandmaster", "A"));
+        let challenger = rank_for((DIVISION_STEPS as i64 + 2) * LP_PER_STEP);
+        assert_eq!(
+            (challenger.label().as_str(), challenger.grade),
+            ("Challenger", "A+")
+        );
+    }
+
+    #[test]
+    fn misses_cost_lp_so_ranks_can_fall() {
+        let good = vec![
+            row("q1", Difficulty::Hard, "correct"),
+            row("q2", Difficulty::Hard, "correct"),
+            row("q3", Difficulty::Hard, "correct"),
+        ];
+        assert_eq!(total_lp(&good), 90);
+        let mut bad = good.clone();
+        bad.push(row("q4", Difficulty::Hard, "incorrect"));
+        assert_eq!(total_lp(&bad), 75);
+        assert!(rank_for(total_lp(&bad)).step < rank_for(total_lp(&good)).step);
+    }
+
+    #[test]
+    fn hint_reveals_direction_but_not_the_answer() {
+        let numeric = "numeric 0\n10.5";
+        let hint = hint_for(numeric, "4", 1);
+        assert!(hint.contains("too low"), "{hint}");
+        assert!(!hint.contains("10.5"), "hint leaked the answer: {hint}");
+
+        let high = hint_for(numeric, "99", 1);
+        assert!(high.contains("too high"), "{high}");
+
+        let exact = "exact\nforty two\n42";
+        assert!(hint_for(exact, "forty  two", 1).contains("formatting"));
+        assert!(!hint_for(exact, "banana", 1).contains("42"));
+    }
+
+    #[test]
+    fn wrong_answers_are_not_terminal() {
+        // hint_for must never be the explanation; retry is the non-final state
+        assert!(!is_resolved(&AttemptQuestion {
+            id: "q1".into(),
+            difficulty: Difficulty::Easy,
+            response: "nope".into(),
+            result: "retry".into(),
+            tries: 1,
+        }));
+        assert!(is_resolved(&AttemptQuestion {
+            id: "q1".into(),
+            difficulty: Difficulty::Easy,
+            response: "nope".into(),
+            result: "incorrect".into(),
+            tries: 1,
+        }));
+    }
+
+    #[test]
     fn awards_points_by_difficulty() {
-        assert_eq!(base_points(Difficulty::Easy), 10);
+        assert_eq!(base_points(Difficulty::Easy), 15);
         assert_eq!(base_points(Difficulty::Medium), 20);
         assert_eq!(base_points(Difficulty::Hard), 30);
     }
 
     #[test]
-    fn only_correct_answers_score() {
+    fn only_correct_answers_earn_and_misses_cost() {
         let rows = vec![
             row("q1", Difficulty::Easy, "correct"),
             row("q2", Difficulty::Hard, "incorrect"),
             row("q3", Difficulty::Medium, "correct"),
         ];
-        assert_eq!(total_points(&rows), 30);
+        // +15 and +20 earned, 15 lost to the missed hard question
+        assert_eq!(total_lp(&rows), 20);
     }
 
     #[test]
-    fn best_streak_survives_a_miss() {
-        let rows = vec![
+    fn accuracy_percentages_round_sensibly() {
+        assert_eq!(
+            Accuracy {
+                correct: 0,
+                total: 0
+            }
+            .percent(),
+            0
+        );
+        assert_eq!(
+            Accuracy {
+                correct: 1,
+                total: 2
+            }
+            .percent(),
+            50
+        );
+        assert_eq!(
+            Accuracy {
+                correct: 9,
+                total: 14
+            }
+            .percent(),
+            64
+        );
+        assert_eq!(
+            Accuracy {
+                correct: 18,
+                total: 25
+            }
+            .percent(),
+            72
+        );
+        let rows = [
             row("q1", Difficulty::Easy, "correct"),
-            row("q2", Difficulty::Easy, "correct"),
+            row("q2", Difficulty::Easy, "incorrect"),
             row("q3", Difficulty::Easy, "correct"),
-            row("q4", Difficulty::Easy, "incorrect"),
-            row("q5", Difficulty::Easy, "correct"),
         ];
-        assert_eq!(best_streak(&rows), 3);
-        assert_eq!(current_streak(&rows), 1);
+        let accuracy = accuracy_of(rows.iter());
+        assert_eq!(
+            (accuracy.correct, accuracy.total, accuracy.percent()),
+            (2, 3, 67)
+        );
     }
 
     #[test]
-    fn levels_advance_every_hundred_points() {
-        assert_eq!(level_for(0), (1, 0, 100));
-        assert_eq!(level_for(120), (2, 20, 100));
-    }
-
-    #[test]
-    fn progress_bar_fills_proportionally() {
-        assert_eq!(progress_bar(0, 4, 4), "░░░░");
-        assert_eq!(progress_bar(2, 4, 4), "██░░");
-        assert_eq!(progress_bar(4, 4, 4), "████");
-        assert_eq!(progress_bar(0, 0, 4), "░░░░");
+    fn champion_needs_roughly_mastering_the_question_bank() {
+        // cs2100's three quiz sets, if every answer lands first try.
+        let bank = (7 * 15 + 11 * 20 + 6 * 30)   // number-systems
+            + (7 * 15 + 11 * 20 + 7 * 30)        // mips-tracing
+            + (7 * 15 + 11 * 20 + 6 * 30); // control-unit
+        assert!(bank >= (DIVISION_STEPS as i64 + 2) * LP_PER_STEP);
     }
 
     #[test]

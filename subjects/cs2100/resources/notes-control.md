@@ -78,7 +78,7 @@ Mapping from `ALUcontrol` to bit-slice controls:
 | `slt` | 0 | 1 | 11 | 0111 |
 | `nor` | 1 | 1 | 00 | 1100 |
 
-Bit order: `ALUcontrol = Ainvert · Binvert · Operation1 · Operation0` (bit 3 = Ainvert, bit 2 = Binvert, bits 1–0 = Operation).
+Bit order: `ALUcontrol = Ainvert · Binvert · Operation_1 · Operation_0` (bit 3 = Ainvert, bit 2 = Binvert, bits 1–0 = Operation).
 
 So: **`sub` = add with `B` inverted** (`Binvert=1`, `Operation=10`); **`nor` = invert both then AND**; **`slt` needs `Binvert=1` and `Operation=11`**.
 The source states: "the implementation for `slt` is not shown". **[NOT IN SOURCE]**: the carry-in-to-LSB trick (set `Cin=1` into bit 0 so `A + ~B + 1 = A - B`) and the set/less-than path are not described in `control.md`; the source only shows that a full adder has a `Cin` input and that slices chain `Cout → Cin`.
@@ -97,11 +97,11 @@ Instead of brute-forcing a 12-input function (`opcode` + `funct`), the source fi
 | `beq` | 01 |
 | R-Format | 10 |
 
-The two bits are `ALUop1` (MSB) and `ALUop0` (LSB); where the source writes the pair as `10`, `01`, `00` it means `ALUop1 ALUop0`. In answers write `ALUop1=…, ALUop0=…`.
+The two bits are `ALUop_1` (MSB) and `ALUop_0` (LSB); where the source writes the pair as `10`, `01`, `00` it means `ALUop_1 ALUop_0`. In answers write `ALUop_1=…, ALUop_0=…`.
 
 Rationale: `lw`/`sw` need ADD (base + offset); `beq` needs SUB (equality test); R-format needs "something else", so the decision is deferred to `funct`.
 
-Then `ALUcontrol` = f(`ALUop1`/`ALUop0`, 6-bit `funct`). This reduces the size of the main controller and can speed up the circuit.
+Then `ALUcontrol` = f(`ALUop_1`/`ALUop_0`, 6-bit `funct`). This reduces the size of the main controller and can speed up the circuit.
 
 ### 7. ALU control — summary table
 
@@ -120,8 +120,8 @@ Conventions: `1` = true, `0` = false, `X` = don't care (output: value is irrelev
 
 ### 8. ALU control — full truth table
 
-`F0`–`F5` are bits 0–5 of `funct`; `ALUop0`, `ALUop1` are bits 0, 1; `ALUcontrol0`–`ALUcontrol3` are bits 0–3.
-Funct is written MSB-first below (`F5 F4 F3 F2 F1 F0`).
+`F_0`–`F_5` are bits 0–5 of `funct`; `ALUop_0`, `ALUop_1` are bits 0, 1; `ALUcontrol_0`–`ALUcontrol_3` are bits 0–3.
+Funct is written MSB-first below (`F_5 F_4 F_3 F_2 F_1 F_0`).
 
 | | ALUop | Funct | ALUcontrol |
 |---|---|---|---|
@@ -136,7 +136,7 @@ Funct is written MSB-first below (`F5 F4 F3 F2 F1 F0`).
 
 ### 9. ALU control — simplified truth table
 
-Obtained by deleting inputs that cannot differentiate any output: `F5`, `F4` are always `10` for R-format; for R-format `ALUop1=1` and `ALUop0` is irrelevant (`1 -`); for `beq` `ALUop0=1` and `ALUop1` is irrelevant (`- 1`).
+Obtained by deleting inputs that cannot differentiate any output: `F_5`, `F_4` are always `10` for R-format; for R-format `ALUop_1=1` and `ALUop_0` is irrelevant (`1 -`); for `beq` `ALUop_0=1` and `ALUop_1` is irrelevant (`- 1`).
 
 | | ALUop | Funct | ALUcontrol |
 |---|---|---|---|
@@ -152,37 +152,37 @@ Obtained by deleting inputs that cannot differentiate any output: `F5`, `F4` are
 ### 10. ALU control unit — Boolean equations (the implementation)
 
 ```
-ALUcontrol3 = 0
-ALUcontrol2 = (F1 . ALUop1) + (ALUop0)
-ALUcontrol1 = !ALUop1 + !F2
-ALUcontrol0 = (F0 + F3) . ALUop1
+ALUcontrol_3 = 0
+ALUcontrol_2 = (F_1 . ALUop_1) + (ALUop_0)
+ALUcontrol_1 = !ALUop_1 + !F_2
+ALUcontrol_0 = (F_0 + F_3) . ALUop_1
 ```
 
 How each equation is justified (source's reasoning pattern — you are expected to reproduce it):
 
-* `ALUcontrol3`: always 0 for every supported instruction.
-* `ALUcontrol2`: 1 when `F1=1` **and** R-format (`ALUop1=1`), OR when it is `beq` (`ALUop0=1`).
-* `ALUcontrol1`: 0 only when `ALUop1=1` **and** `F2=1`; negate that condition → `!(ALUop1 . F2)` = De Morgan → `!ALUop1 + !F2`. For all non-R-format it is simply 1.
-* `ALUcontrol0`: 1 for `or` (`F0=1`) or `slt` (`F3=1`), but only for R-format, hence `(F0 + F3) . ALUop1`.
+* `ALUcontrol_3`: always 0 for every supported instruction.
+* `ALUcontrol_2`: 1 when `F_1=1` **and** R-format (`ALUop_1=1`), OR when it is `beq` (`ALUop_0=1`).
+* `ALUcontrol_1`: 0 only when `ALUop_1=1` **and** `F_2=1`; negate that condition → `!(ALUop_1 . F_2)` = De Morgan → `!ALUop_1 + !F_2`. For all non-R-format it is simply 1.
+* `ALUcontrol_0`: 1 for `or` (`F_0=1`) or `slt` (`F_3=1`), but only for R-format, hence `(F_0 + F_3) . ALUop_1`.
 
 ### 11. Main control unit — opcode map
 
-`Op5`–`Op0` are bits 5–0 of the 6-bit `opcode`.
+`Op_5`–`Op_0` are bits 5–0 of the 6-bit `opcode`.
 
-| | Op5 | Op4 | Op3 | Op2 | Op1 | Op0 | Hexadecimal |
+| | Op_5 | Op_4 | Op_3 | Op_2 | Op_1 | Op_0 | Hexadecimal |
 |---|---|---|---|---|---|---|---|
 | R-Format | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `lw` | 1 | 0 | 0 | 0 | 1 | 1 | 23 |
 | `sw` | 1 | 0 | 1 | 0 | 1 | 1 | 2B |
 | `beq` | 0 | 0 | 0 | 1 | 0 | 0 | 4 |
 
-`opcode = Inst[26:31]`; `funct = Inst[0:5]`. Only the opcode enters the main control unit; only `opcode` (→`ALUop1`/`ALUop0`) and `funct` enter the ALU control unit.
+`opcode = Inst[26:31]`; `funct = Inst[0:5]`. Only the opcode enters the main control unit; only `opcode` (→`ALUop_1`/`ALUop_0`) and `funct` enter the ALU control unit.
 
 ### 12. Main control unit — truth table
 
-`Ctrl` is the merged output vector. Bit positions: `Ctrl0`=RegDst, `Ctrl1`=ALUSrc, `Ctrl2`=MemToReg, `Ctrl3`=RegWrite, `Ctrl4`=MemRead, `Ctrl5`=MemWrite, `Ctrl6`=Branch, `Ctrl7`=ALUop1, `Ctrl8`=ALUop0.
+`Ctrl` is the merged output vector. Bit positions: `Ctrl_0`=RegDst, `Ctrl_1`=ALUSrc, `Ctrl_2`=MemToReg, `Ctrl_3`=RegWrite, `Ctrl_4`=MemRead, `Ctrl_5`=MemWrite, `Ctrl_6`=Branch, `Ctrl_7`=ALUop_1, `Ctrl_8`=ALUop_0.
 
-| | RegDst | ALUSrc | MemToReg | RegWrite | MemRead | MemWrite | Branch | ALUop1 | ALUop0 |
+| | RegDst | ALUSrc | MemToReg | RegWrite | MemRead | MemWrite | Branch | ALUop_1 | ALUop_0 |
 |---|---|---|---|---|---|---|---|---|---|
 | R-Format | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 |
 | `lw` | 0 | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
@@ -204,14 +204,14 @@ Each `Ctrl` bit is a **selector**: it is 1 exactly when the current instruction 
 | 4 | `MemRead` | `lw` |
 | 5 | `MemWrite` | `sw` |
 | 6 | `Branch` | `beq` |
-| 7 | `ALUop1` | R-Format |
-| 8 | `ALUop0` | `beq` |
+| 7 | `ALUop_1` | R-Format |
+| 8 | `ALUop_0` | `beq` |
 
 Selectors are combined with OR gates only. Because `sw`/`beq` have `X` for `RegDst`/`MemToReg`, this implementation emits a concrete value for them: **`RegDst=0` and `MemToReg=0`** for both `sw` and `beq` (neither is R-Format, and neither is `lw`). Those values are legal but arbitrary — the truth table marks them don't-care.
 
 ### 14. Per-instruction control vectors (memorise these)
 
-| Instruction | RegDst | ALUSrc | MemToReg | RegWrite | MemRead | MemWrite | Branch | ALUop1 ALUop0 | ALUcontrol |
+| Instruction | RegDst | ALUSrc | MemToReg | RegWrite | MemRead | MemWrite | Branch | ALUop_1 ALUop_0 | ALUcontrol |
 |---|---|---|---|---|---|---|---|---|---|
 | `add $rd,$rs,$rt` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 10 | 0010 |
 | `sub $rd,$rs,$rt` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 10 | 0110 |
@@ -235,8 +235,8 @@ For `beq`, the final next-PC decision is `PCSrc = Branch & isZero?` = `1 & isZer
 ### 16. PROCEDURE — answering "give every control signal for this instruction"
 
 1. **Decode the format.** Opcode `000000` → R-format (fields `rs`,`rt`,`rd`,`shamt`,`funct`). Opcode `100011` → `lw`, `101011` → `sw`, `000100` → `beq` (I-format: `rs`,`rt`,`immediate`). Anything else is outside the supported subset.
-2. **Write out the two ALUop bits.** `lw`/`sw` → `ALUop1=0, ALUop0=0`; `beq` → `ALUop1=0, ALUop0=1`; R-format → `ALUop1=1, ALUop0=0`.
-3. **If R-format, read `funct` (`Inst[0:5]`)** and cross-reference the simplified truth table (or apply the four Boolean equations) to get the 4-bit `ALUcontrol`. If not R-format, `funct` is a don't care — `ALUcontrol` comes from `ALUop1`/`ALUop0` alone.
+2. **Write out the two ALUop bits.** `lw`/`sw` → `ALUop_1=0, ALUop_0=0`; `beq` → `ALUop_1=0, ALUop_0=1`; R-format → `ALUop_1=1, ALUop_0=0`.
+3. **If R-format, read `funct` (`Inst[0:5]`)** and cross-reference the simplified truth table (or apply the four Boolean equations) to get the 4-bit `ALUcontrol`. If not R-format, `funct` is a don't care — `ALUcontrol` comes from `ALUop_1`/`ALUop_0` alone.
 4. **Set `RegDst`.** R-format → 1 (`$rd`). `lw` → 0 (`$rt`). `sw`/`beq` → X (implementation gives 0). Remember: `RegDst` matters only when `RegWrite=1`.
 5. **Set `ALUSrc`.** `lw`/`sw` → 1 (needs the sign-extended immediate for the address). R-format/`beq` → 0.
 6. **Set `RegWrite`.** R-format/`lw` → 1. `sw`/`beq` → 0.
@@ -244,9 +244,9 @@ For `beq`, the final next-PC decision is `PCSrc = Branch & isZero?` = `1 & isZer
 8. **Set `MemToReg`.** `lw` → 1 (memory data). R-format → 0 (ALU result). `sw`/`beq` → X (implementation gives 0). Remember the mux is flipped.
 9. **Set `Branch`.** `beq` → 1, everything else → 0.
 10. **Finish with the derived signals:** `ALUcontrol` (step 3) and `PCSrc = Branch & isZero?` (only 1 for `beq` when `$rs == $rt`).
-11. **Sanity checks.** Exactly one of `MemRead`/`MemWrite` may be 1; `sw` and `beq` never write a register; `ALUop1=1` (R-format) must be accompanied by `RegDst=1` and `ALUSrc=0`.
+11. **Sanity checks.** Exactly one of `MemRead`/`MemWrite` may be 1; `sw` and `beq` never write a register; `ALUop_1=1` (R-format) must be accompanied by `RegDst=1` and `ALUSrc=0`.
 
-Reverse direction ("which instruction is this pattern?"): use the discriminating signals first — `Branch=1` ⇒ `beq`; `MemWrite=1` ⇒ `sw`; `MemRead=1` (and `RegWrite=1`) ⇒ `lw`; `ALUop1=1` ⇒ R-format, then `ALUcontrol` picks which R-format instruction.
+Reverse direction ("which instruction is this pattern?"): use the discriminating signals first — `Branch=1` ⇒ `beq`; `MemWrite=1` ⇒ `sw`; `MemRead=1` (and `RegWrite=1`) ⇒ `lw`; `ALUop_1=1` ⇒ R-format, then `ALUcontrol` picks which R-format instruction.
 
 ### 17. Big picture
 
@@ -272,8 +272,8 @@ Given Memory 2 ns, ALU/Adder 2 ns, Register 1 ns, **every** instruction takes 8 
 3. **`bne` vs `beq`.** ch08's intro lists `beq` *and* `bne`, but the supported-instruction list and control truth table contain only `beq`. If asked about `bne`, the source gives no control vector.
 4. **Decode-stage signal names/values (ch08a2) are corrupted.** The numbered list gives `RegDst` twice (item 3 is clearly meant to be `ALUSrc`), and item 3's value for the immediate path says `Inst[15:11]` — it should be `sign_extend(Inst[15:0])` as stated in ch08c1. Item 1 (`Inst[20:16]`→0, `Inst[15:11]`→1) is correct and matches ch08c1.
 5. **`slt` and `Operation=11` are undocumented.** The 1-bit ALU lists only `Operation` 00/01/10, yet the `slt` row needs `11`, and the source says "the implementation for `slt` is not shown". The subtraction carry-in trick (LSB `Cin=1`) is likewise never spelled out — only the abstract `Cin` of the full adder and `Cout → Cin` chaining are shown.
-6. **`ALUcontrol1` has two forms.** The source first derives `(ALUop1 . !F2) + (!ALUop1)` and then, via De Morgan, presents `!ALUop1 + !F2`. Both are equivalent; the final boxed form is the second.
-7. **`ALUcontrol0` is asserted without derivation** — the source presents `(F0 + F3) . ALUop1` and asks the reader to justify it. It does check out against the simplified truth table (`or` → `F0=1`, `slt` → `F3=1`, both restricted to R-format).
+6. **`ALUcontrol_1` has two forms.** The source first derives `(ALUop_1 . !F_2) + (!ALUop_1)` and then, via De Morgan, presents `!ALUop_1 + !F_2`. Both are equivalent; the final boxed form is the second.
+7. **`ALUcontrol_0` is asserted without derivation** — the source presents `(F_0 + F_3) . ALUop_1` and asks the reader to justify it. It does check out against the simplified truth table (`or` → `F_0=1`, `slt` → `F_3=1`, both restricted to R-format).
 8. **`sw` labelled R-Format in ch08b.** In the assembler walkthrough, `sw` is introduced as "*R-Format*" while the fields shown (`opcode` 43 = `101011`, `$rs`, `$rt`, `immediate`) are clearly **I-format**. The field table is right; the label is a typo.
 9. **Instruction-format list typo.** In ch08c1's instruction table, `beq` is written as `beq $rd, $rs, label`; `beq` takes `$rs` and `$rt` (as shown everywhere else in the source).
-10. **`addi` appears in a decode example but is not in the supported subset.** ch08a2 traces `addi $21, $22, -50` to motivate the `RegDst`/`ALUSrc` muxes; ch08c1's supported list and truth table do not include `addi`. There is no control vector for `addi` in the truth table (and `addi` would need `RegDst=0`, `ALUSrc=1`, `RegWrite=1`, with `ALUop1`/`ALUop0` never stated — so do not quote a vector for it).
+10. **`addi` appears in a decode example but is not in the supported subset.** ch08a2 traces `addi $21, $22, -50` to motivate the `RegDst`/`ALUSrc` muxes; ch08c1's supported list and truth table do not include `addi`. There is no control vector for `addi` in the truth table (and `addi` would need `RegDst=0`, `ALUSrc=1`, `RegWrite=1`, with `ALUop_1`/`ALUop_0` never stated — so do not quote a vector for it).
