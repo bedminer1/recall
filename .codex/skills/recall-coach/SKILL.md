@@ -49,6 +49,8 @@ After writing the quiz, tell the user its short name so they can run `recall sta
 
 Open the requested attempt and its `source-quiz`. Only mark questions whose source answer rule is `manual` and whose result remains `pending`.
 
+Scope the work to what was asked: if the user names one question, mark only that one. Marking a single question is the normal case, because the user works one question at a time and expects feedback immediately.
+
 Compare the response with the frozen answer and explanation. Replace:
 
 ```markdown
@@ -68,4 +70,17 @@ Inside that question's `feedback` block, write a short explanation containing:
 2. the specific missing or mistaken idea;
 3. the corrected reasoning.
 
-Do not change the response, question, answer scheme, difficulty, or progress file. Do not award partial status in the MVP: if a material requirement is missing, mark it incorrect. When finished, tell the user to rerun `recall submit <attempt-id>`.
+A blank response is `incorrect` — do not mark it pending.
+
+Do not change the response, question, answer scheme, difficulty, or progress file. Do not award partial status in the MVP: if a material requirement is missing, mark it incorrect.
+
+When finished, tell the user the verdict and the exact command to record it:
+
+```sh
+recall submit <attempt-id> <question-id>
+```
+
+If you marked several questions, list each verdict with its id and tell them to run `recall submit <attempt-id>` with no question id to record them all at once.
+
+`recall mark <attempt-id> <question-id> correct|incorrect` is the user's own self-check path. Do not run it on their behalf — if they ask you to mark a question, edit the attempt file as described above.
+
