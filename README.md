@@ -76,7 +76,7 @@ The completion bonus scales with both paper size and accuracy. High ranks also r
 
 - Master / A− requires 80%
 - Grandmaster / A requires 85%
-- Challenger / A+ requires 92%
+- Challenger / A+ requires 90%
 
 ## One-minute user guide
 
@@ -87,6 +87,8 @@ From this repository:
 ```sh
 cargo install --path .
 ```
+
+Scoring is yours to tune: edit `recall.toml` to change accuracy gates, LP per division, easy/medium/hard rewards, retry scaling, wrong-answer penalties, or the paper-completion bonus. Changes apply on the next run.
 
 ### 2. Give your files to an AI
 

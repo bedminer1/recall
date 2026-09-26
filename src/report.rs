@@ -61,7 +61,7 @@ pub(crate) fn report(
                     format!(
                         "   (try {}, after -{} LP)",
                         row.tries,
-                        WRONG_PENALTY * i64::from(row.tries - 1)
+                        wrong_penalty() * i64::from(row.tries - 1)
                     )
                 } else {
                     String::new()
@@ -86,7 +86,7 @@ pub(crate) fn report(
                     .unwrap_or_default();
                 let charged = wrong_attempts.iter().any(|row| row.question == *id);
                 let penalty = if charged {
-                    format!("   -{WRONG_PENALTY} LP")
+                    format!("   -{} LP", wrong_penalty())
                 } else {
                     String::new()
                 };
@@ -128,7 +128,7 @@ pub(crate) fn report(
         .filter(|row| row.result == "correct")
         .map(|row| i64::from(points_for(row.difficulty, "correct", row.tries)))
         .sum::<i64>()
-        - WRONG_PENALTY * run_penalised as i64
+        - wrong_penalty() * run_penalised as i64
         + i64::from(completion_bonus);
 
     println!();

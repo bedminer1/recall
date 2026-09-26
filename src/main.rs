@@ -21,6 +21,7 @@ use std::env;
 use std::process::ExitCode;
 
 mod commands;
+mod config;
 mod cs2100;
 mod grading;
 mod markdown;
@@ -50,6 +51,9 @@ pub(crate) fn main() -> ExitCode {
 
 pub(crate) fn run() -> AppResult<()> {
     let args: Vec<String> = env::args().skip(1).collect();
+    if let Ok(root) = find_root() {
+        config::load(&root)?;
+    }
     match args.as_slice() {
         [] => dashboard(&find_root()?),
         [command] if command == "help" || command == "--help" || command == "-h" => {
@@ -83,6 +87,7 @@ pub(crate) fn run() -> AppResult<()> {
 }
 
 pub(crate) fn print_help() {
+    let scoring = config::get();
     println!(
         "Recall\n\n\
          usage:\n\
@@ -98,12 +103,13 @@ pub(crate) fn print_help() {
            recall <subject> rank                     graph rank history for one subject\n\
            recall                                    dashboard\n\n\
          A wrong answer is not final: you get a hint and another go, but the\n\
-         wrong attempt is charged -20 LP and counts as a loss in accuracy.\n\
-         Correct answers earn LP (easy 20, medium 30, hard 40), halved and\n\
+         wrong attempt is charged -{} LP and counts as a loss in accuracy.\n\
+         Correct answers earn LP (easy {}, medium {}, hard {}), divided and\n\
          floored for each retry. Completing a paper adds an accuracy bonus.\n\
          LP per subject sets your rank:\n\
            Iron - Bronze - Silver - Gold - Platinum - Emerald - Diamond\n\
-           Master (A-) - Grandmaster (A) - Challenger (A+)\n"
+           Master (A-) - Grandmaster (A) - Challenger (A+)\n",
+        scoring.wrong_answer, scoring.rewards[0], scoring.rewards[1], scoring.rewards[2],
     );
 }
 

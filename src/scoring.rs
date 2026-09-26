@@ -7,14 +7,16 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::config;
 use crate::model::*;
 
 /// Full points for a first-try correct answer, weighted by difficulty.
 pub(crate) fn base_points(difficulty: Difficulty) -> u32 {
+    let rewards = config::get().rewards;
     match difficulty {
-        Difficulty::Easy => 20,
-        Difficulty::Medium => 30,
-        Difficulty::Hard => 40,
+        Difficulty::Easy => rewards[0],
+        Difficulty::Medium => rewards[1],
+        Difficulty::Hard => rewards[2],
     }
 }
 
@@ -31,7 +33,7 @@ pub(crate) fn points_for(difficulty: Difficulty, result: &str, tries: u32) -> u3
         if points <= 1 {
             return 0;
         }
-        points /= 2;
+        points /= config::get().retry_divisor;
     }
     points
 }
@@ -49,11 +51,6 @@ pub(crate) const DIVISIONS_PER_TIER: u32 = 3;
 
 /// LP required for one division in each tier. Early ranks move quickly, the
 /// middle of the ladder ramps smoothly, and Diamond is deliberately sticky.
-pub(crate) const TIER_LP_PER_DIVISION: [i64; 7] = [60, 65, 75, 85, 110, 125, 180];
-
-/// LP required for each step at Master and above.
-pub(crate) const ELITE_LP_PER_STEP: i64 = 250;
-
 /// Number of divisions below Master (7 tiers x 3 divisions).
 pub(crate) const DIVISION_STEPS: u32 = 21;
 
@@ -162,9 +159,9 @@ pub(crate) fn rank_for(total_lp: i64) -> Rank {
 /// Cost of the division represented by a zero-based ladder step.
 pub(crate) fn lp_cost_for_step(step: u32) -> i64 {
     if step < DIVISION_STEPS {
-        TIER_LP_PER_DIVISION[(step / DIVISIONS_PER_TIER) as usize]
+        config::get().tier_lp[(step / DIVISIONS_PER_TIER) as usize]
     } else {
-        ELITE_LP_PER_STEP
+        config::get().elite_lp
     }
 }
 
@@ -178,18 +175,16 @@ pub(crate) fn lp_to_reach_step(step: u32) -> i64 {
 /// alone is enough for a high rank.
 pub(crate) fn accuracy_step_cap(accuracy: Accuracy) -> u32 {
     let percent = accuracy.percent();
-    match percent {
-        0..=44 => 2,   // Iron I
-        45..=54 => 5,  // Bronze I
-        55..=59 => 8,  // Silver I
-        60..=64 => 11, // Gold I
-        65..=69 => 14, // Platinum I
-        70..=74 => 17, // Emerald I
-        75..=79 => 20, // Diamond I
-        80..=84 => 21, // Master (A-)
-        85..=91 => 22, // Grandmaster (A)
-        _ => u32::MAX, // Challenger (A+)
+    for (index, gate) in config::get().accuracy_gates.into_iter().enumerate() {
+        if percent < gate {
+            return match index {
+                0 => 2,
+                1..=6 => 2 + index as u32 * 3,
+                _ => 20 + index as u32 - 6,
+            };
+        }
     }
+    u32::MAX
 }
 
 pub(crate) fn rank_for_performance(total_lp: i64, accuracy: Accuracy) -> Rank {
@@ -203,17 +198,18 @@ pub(crate) fn rank_for_performance(total_lp: i64, accuracy: Accuracy) -> Rank {
 }
 
 pub(crate) fn accuracy_required_for_step(step: u32) -> u32 {
+    let gates = config::get().accuracy_gates;
     match step {
         0..=2 => 0,
-        3..=5 => 45,
-        6..=8 => 55,
-        9..=11 => 60,
-        12..=14 => 65,
-        15..=17 => 70,
-        18..=20 => 75,
-        21 => 80,
-        22 => 85,
-        _ => 92,
+        3..=5 => gates[0],
+        6..=8 => gates[1],
+        9..=11 => gates[2],
+        12..=14 => gates[3],
+        15..=17 => gates[4],
+        18..=20 => gates[5],
+        21 => gates[6],
+        22 => gates[7],
+        _ => gates[8],
     }
 }
 
@@ -227,11 +223,13 @@ pub(crate) fn next_rank(lp: i64) -> Rank {
 }
 
 /// Flat cost of getting a question wrong, charged on every wrong attempt.
-pub(crate) const WRONG_PENALTY: i64 = 20;
+pub(crate) fn wrong_penalty() -> i64 {
+    config::get().wrong_answer
+}
 
 /// LP over a whole history.
 ///
-/// Each wrong attempt costs `WRONG_PENALTY`; solving it afterwards still pays
+/// Each wrong attempt costs the configured penalty; solving it afterwards still pays
 /// the halved reward, so redeeming yourself recovers some of the cost. A
 /// question that was never charged a wrong attempt (rows written before
 /// retries existed) has its miss charged once, on the final row.
@@ -243,12 +241,12 @@ pub(crate) fn total_lp(rows: &[ProgressRow]) -> i64 {
         match row.result.as_str() {
             "wrong" => {
                 charged.insert(key);
-                lp -= WRONG_PENALTY;
+                lp -= wrong_penalty();
             }
             "correct" => lp += i64::from(points_for(row.difficulty, "correct", row.tries)),
             "incorrect" => {
                 if charged.insert(key) {
-                    lp -= WRONG_PENALTY;
+                    lp -= wrong_penalty();
                 }
             }
             "bonus" => lp += i64::from(row.tries),
@@ -288,8 +286,10 @@ pub(crate) fn paper_completion_bonus(accuracy: Accuracy) -> u32 {
     }
     let correct = accuracy.correct as u64;
     let total = accuracy.total as u64;
-    let numerator = 25_u64 * total * correct * correct;
-    let denominator = total * total;
+    let settings = config::get();
+    let numerator =
+        u64::from(settings.bonus_per_question) * total * correct.pow(settings.bonus_accuracy_power);
+    let denominator = total.pow(settings.bonus_accuracy_power);
     ((numerator + denominator / 2) / denominator) as u32
 }
 
@@ -393,7 +393,18 @@ mod tests {
             rank_for_performance(
                 lp,
                 Accuracy {
-                    correct: 92,
+                    correct: 89,
+                    total: 100
+                }
+            )
+            .label(),
+            "Grandmaster"
+        );
+        assert_eq!(
+            rank_for_performance(
+                lp,
+                Accuracy {
+                    correct: 90,
                     total: 100
                 }
             )

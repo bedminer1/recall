@@ -1,0 +1,33 @@
+# Recall scoring configuration. Changes apply the next time `recall` runs.
+
+[rewards]
+easy = 20
+medium = 30
+hard = 40
+# Each retry divides the available reward by this amount.
+retry_divisor = 2
+
+[penalties]
+wrong_answer = 20
+
+[ranks]
+# Iron, Bronze, Silver, Gold, Platinum, Emerald, Diamond.
+lp_per_division = [60, 65, 75, 85, 110, 125, 180]
+# Master -> Grandmaster and Grandmaster -> Challenger.
+elite_lp_per_rank = 250
+
+[accuracy_gates]
+bronze = 45
+silver = 55
+gold = 60
+platinum = 65
+emerald = 70
+diamond = 75
+master = 80
+grandmaster = 85
+challenger = 90
+
+[paper_bonus]
+# Bonus = questions * this value * accuracy ^ accuracy_power.
+lp_per_question = 25
+accuracy_power = 2
