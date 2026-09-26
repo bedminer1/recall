@@ -89,6 +89,14 @@ Inside that question's `feedback` block, write a short explanation containing:
 2. the specific missing or mistaken idea;
 3. the corrected reasoning.
 
+**Never delete what is already in a `feedback` block.** The student writes their own
+working in there, so add your explanation underneath it rather than replacing the block.
+
+**Never touch a `notes` block.** Every question carries a `<!-- notes:start -->` /
+`<!-- notes:end -->` area holding the student's own thinking, and the attempt header has a
+`Working notes` section. It is theirs: read it if it helps you mark, but do not edit,
+reformat, move or delete it, and never write your own text into it.
+
 A blank response is not an attempt: leave it `pending` and ask them to write something first.
 
 Do not change the response, question, answer scheme, difficulty, or progress file. Do not award partial status in the MVP: if a material requirement is missing, mark it incorrect.

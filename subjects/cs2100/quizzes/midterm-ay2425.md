@@ -24,6 +24,10 @@ Option C
 Since this is signed magnitude, it is equivalent to 7-bit (after taking away the sign bit) 0110010₂ + 0111101₂ = 1101111₂, option C.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Strip the sign bits and operate on the remaining 7 bits, then fix the sign separately. Remember the second operand's sign bit is not a magnitude digit.
+<!-- hint:end -->
+
 ## q2 [medium]
 
 Bob decided to design a new processor that works with 137 bits integers. He decided also to use two's complement to represent signed integer. Which of the following in hexadecimal is the largest positive integer that can exist in his representation system?
@@ -42,6 +46,10 @@ Option A
 <!-- explanation:start -->
 Taking away one bit for the sign bit, we are left with 136 bits. This gives nicely 34 hexadecimals 'F's – which will be the largest positive integer, option A.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Set aside one bit for the sign, then see how many hex digits the remaining 136 bits fill. Each hex digit is exactly 4 bits.
+<!-- hint:end -->
 
 ## q3 [medium]
 
@@ -94,6 +102,10 @@ Checking option D:
 So this is the answer we want, coz the result of the subtraction does not match up.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Convert each operand to decimal in its own base and test the claimed result. The same symbol can mean a different value once the base changes.
+<!-- hint:end -->
+
 ## q4 [medium]
 
 Which of the following in hexadecimal would represent the smallest positive normalized floating point number representable in the IEEE Standard 754 single precision (32-bit) floating point?
@@ -114,6 +126,10 @@ In the IEEE floating point format, the number represented is a normalized number
 
 For the smallest positive number, the sign bit must be 0. Given the above, the smallest biased exponent is 1. And the mantissa bit is all zero (with the implicit 1 "holding the fort".) This gives us the answer being option B.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Normalized rules out the all-zero and all-ones biased exponents. Find the smallest legal biased exponent, then ask what the mantissa bits should be.
+<!-- hint:end -->
 
 ## q5 [medium]
 
@@ -139,6 +155,10 @@ The mantisaa is 1.01₂ = 1 + 0.25 = 1.25.
 So the answer is –(1.25 x 2⁻²) = -0.3125. Option D.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Split the 32 bits into sign, 8-bit biased exponent and 23-bit fraction. Remove the bias before applying the power of two, and restore the implicit leading 1.
+<!-- hint:end -->
+
 ## q6 [medium]
 
 Which of the following is the smallest positive base-10 value that is representable as a 32-bit integer but cannot be represented precisely as in IEEE Standard 754 single precision (32-bit) floating point? In other words, when one converts the said value (let's call it A) into the IEEE Standard 754 single precision (32-bit) floating point representation (let's call it F), and then convert F back into an integer (let's call it B), then A will not be equal to B.
@@ -158,6 +178,10 @@ Option C
 We have only 23 bits in the mantissa of the IEEE Standard 754 single precision (32-bit) floating point to represent an integer. We do have an additional implicit "1". In addition, the burden of the sign is taken care of by the sign bit. So if we have a number (in binary) that starts with a '1' followed by 23 '0's – and then a '1' (a 25 bit number), then even utilizing the implicit '1' at the MSB, we still need 24 bits – one more than what we have. Hence this integer will not be representable. This number is 0x1000001, which is 16777217₁₀, option C.
 Do note that this does not mean every integer after it will not be representable exactly. For instance, 0x2000000, although larger than our answer, is exactly representable because after normalization and dropping the zeros to the right, we have a mantissa with less than 23 significant bits (and a larger exponent) , and hence is representable both as an 32-bit integer and a IEEE Standard 754 32-bit floating point number exactly.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Work out how many significant bits the significand really has (23 stored plus the implicit 1), then find the first integer needing one bit more.
+<!-- hint:end -->
 
 ## q7 [medium]
 
@@ -180,6 +204,10 @@ Option B: this is the correct answer. The remaining one will be filled with a ze
 Option C: square bracket used in the initializer.
 Option D: missing element.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Check each initializer against C's array rules: braces, element count versus declared size, and whether elements may be omitted.
+<!-- hint:end -->
 
 ## q8 [medium]
 
@@ -207,6 +235,10 @@ Option C
 <!-- explanation:start -->
 There are two increments of i. What is printed is the pre-incremented i. So the answer is C.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+There are two increments of i per iteration, so count carefully. Note that the printf sees the value produced by the pre-increment operator.
+<!-- hint:end -->
 
 ## q9 [medium]
 
@@ -243,6 +275,10 @@ Option A
 The innermost printf() prints its local variant of x – which is always initialized to 3. So 4 "3"s will be printed, even though x is post-incremented in the printf() because each time round this loop, a new x is instantiated. The final printf() prints the variant of x that is local to main() and which scopes out the global x. Hence it prints "2". So the answer is option A.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Track which declaration each x refers to: global, main's local, the loop variable, and the innermost block's. The inner x is recreated on every iteration.
+<!-- hint:end -->
+
 ## q10 [medium]
 
 Suppose a small modification is made to the C program from Question 9 (underlined below):
@@ -278,6 +314,10 @@ Option D
 <!-- explanation:start -->
 Here, the big difference is in the innermost printf() prints its local variant of x is now declared as "static". This means that there shall be only one instance of it. This will result in this same instance being incremented each time round the loop. So the answer is option D.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+A static local is initialized only once and persists across iterations. Compare that lifetime with the automatic local in the earlier version.
+<!-- hint:end -->
 
 ## q11 [medium]
 
@@ -324,6 +364,10 @@ Option B
 q was initially pointing at p[0]. After the "*q++", it points to p[1] (while modifying p[0] to point to A[2]) which contains the address of A[3]. The double dereferencing therefore changed what p[1] points to which is namely, A[3]. So the answer is option B.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Work out where q points before and after the post-increment; *q++ means *(q++). Then see which array element the second dereference ends up writing.
+<!-- hint:end -->
+
 ## q12 [medium]
 
 What is the hexadecimal encoding for the following instruction:
@@ -344,6 +388,10 @@ Option B
 <!-- explanation:start -->
 This is a giveaway question. I expect everyone to get it right. The correct answer is B.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Lay the instruction out as I-type: opcode, two 5-bit register numbers, then the immediate in 16-bit two's complement. Encode the negative value carefully.
+<!-- hint:end -->
 
 ## q13 [medium]
 
@@ -368,6 +416,10 @@ Option C
 This should also be easy. PC+4 = 0x4020. So the constant for the bne is (0x35F0 – 0x4020)/4 = 0xFD74 (16 bits two's complement). Hence, the answer is C.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Compute PC+4 first, then the offset as (target - (PC+4)) divided by 4 in 16-bit two's complement. The offset counts words, not bytes.
+<!-- hint:end -->
+
 ## q14 [medium]
 
 As a standard practice, we use an ori instruction to set a register with the 16-bit immediate zero extended to 32 bits, after a lui instruction has loaded the upper 16 bits. Which of the following MIPS instruction can also be used instead of the ori instruction to do the same thing?
@@ -390,6 +442,10 @@ We cannot use andi because the lower 16 bits after lui is 0. And and'ing anythin
 We cannot use slti because the result is a comparison true (1) or false (0).
 We cannot use nor because there is no immediate. We will need additional operations and that will complicate things.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+For each candidate, ask whether it zero-extends its immediate and can leave the existing low 16 bits untouched. addi sign-extends, and andi clears.
+<!-- hint:end -->
 
 ## q15 [medium]
 
@@ -414,6 +470,10 @@ Option C
 PC+4 = 0x30000000. The address bits from the instruction are 0x012348. We multiply this by 4 to get 0x48D20. Appending this to the upper 4 bits of the PC yields the resultant PC of 0x30048D20, i.e. option C.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+For a jump, take the upper bits from PC+4 and concatenate them with the shifted address field. Check how many bits the address field contributes.
+<!-- hint:end -->
+
 ## q16 [medium]
 
 According to the MIPS reference data sheet, the last occupied location on the top of the stack is pointed to by $sp and is word aligned. Which of the following would implement a pseudo stack push instruction that pushes the content of $x onto the stack?
@@ -436,6 +496,10 @@ Option B
 The stack pointer first has to be decremented (since the stack grows towards the lower addresses) to yield an empty word before a sw is used to store it. So the answer is B.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+The stack grows toward lower addresses, so decide whether $sp moves before or after the store, and by how many bytes one word takes.
+<!-- hint:end -->
+
 ## q17 [medium]
 
 For Questions 17 and 18, we will assume the parameters used in the standard MIPS encoding as shown in the MIPS Reference Sheet. In particular, we will assume that there are three instruction types: R-type, I-type, and J-type instructions. We will assume that for R-type, there are two subtypes – R-type integer and R-type floating point instructions that have the opcode of 0x00 and 0x11, respectively.
@@ -457,6 +521,10 @@ Option B
 This is a giveaway question. For each R-type instruction opcode, we have 6-bits of func code that yields 64 instructions. So the answer is B.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+The opcode is fixed for R-type integer, so only the remaining field varies. Count how many values that field can take.
+<!-- hint:end -->
+
 ## q18 [medium]
 
 For Questions 17 and 18, we will assume the parameters used in the standard MIPS encoding as shown in the MIPS Reference Sheet. In particular, we will assume that there are three instruction types: R-type, I-type, and J-type instructions. We will assume that for R-type, there are two subtypes – R-type integer and R-type floating point instructions that have the opcode of 0x00 and 0x11, respectively.
@@ -477,6 +545,10 @@ Option C
 <!-- explanation:start -->
 This would simply extend the func code to 11 bits and that will yield 2048 instructions. So the answer is C.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Freeing the shift-amount bits widens the func field. Add those reclaimed bits to the original width before counting combinations.
+<!-- hint:end -->
 
 ## q19 [medium]
 
@@ -504,6 +576,10 @@ Option D
 Type A instructions require 9 bits for operands. Type B requires 6 bits for operands while Type C only needs 3. So for Type A, B and C instructions, we can have 7, 10 and 13 bits available as opcode.
 To maximize the number of instructions, we should have just 1 Type A, 1 Type B, and give all the opcode bits to Type C. We can have 3-tier opcode field with 7 bits for the first opcode, 3 bits for the next and another 3 bit for the third level. We can reserve 0000000₂ to be the opcode for the only Type A instruction. Then we can use 0000001000₂ for one Type B instruction. Then the second level opcode of 0000001001₂ (inclusive) onwards can be used for Type C. From 0000001001₂ to 1111111111₂ there are 1015 slots. Each of these will allow for another 8 slots (000₂-111₂) at the third level. This yields 1015 x 8 = 8120. So the maximum would be 8120 + 1 Type A + 1 Type B = 8122, option D.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Think of a tiered opcode: reserve as few top-level prefixes as possible for the smaller operand types, then let the remaining prefixes expand at the next level.
+<!-- hint:end -->
 
 ## q20 [medium]
 
@@ -535,6 +611,10 @@ This leaves us with 0000010₂ to 1111111₂ to be used for Type A instructions.
 So number of Type A = 126, number of Type B = 8, number of Type C = 64. Total is 198 – assuming all opcodes are used. The answer is A.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+To minimize, give each of the two shorter types a single prefix and let its leftover bits expand; all remaining prefixes go to Type A. Then total each type.
+<!-- hint:end -->
+
 ## q21 [medium]
 
 In the MIPS datapath taught in class, which of the following statements is false?
@@ -553,6 +633,10 @@ Option B
 <!-- explanation:start -->
 RD2 is not used by the lw/sw instructions.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+For each claim, check which instructions actually read the second register-file output, including memory load and store instructions.
+<!-- hint:end -->
 
 ## q22 [medium]
 
@@ -581,6 +665,10 @@ Option C
 The lw instruction needs the value from memory and can't just do with the ALUoutput.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Ask which instructions route a value from memory into the register file, and what breaks if write-back is hardwired to the ALU output.
+<!-- hint:end -->
+
 ## q23 [medium]
 
 In the MIPS datapath taught in class, which of the following statements is true?
@@ -599,6 +687,10 @@ Option D
 <!-- explanation:start -->
 From the definition of the clock and when the update to PC happens during the cycle.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Check the widths, control signals and clock-edge behaviour against the datapath; register updates happen on an edge, not mid-cycle.
+<!-- hint:end -->
 
 ## q24 [medium]
 
@@ -619,6 +711,10 @@ Option C
 This is mainly to do with the diagram and to keep it clean.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+This is about diagram readability rather than function. Ask what reversing those two inputs does to how the wires are drawn.
+<!-- hint:end -->
+
 ## q25 [medium]
 
 In the MIPS datapath taught in class, which of the following statements is false?
@@ -638,6 +734,10 @@ Option E
 All of the provided statements from A – D are true.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Verify each claim against the reference sheet: register count, field widths, and what drives ALUcontrol. A statement can sound odd yet still be true.
+<!-- hint:end -->
+
 ## q26 [hard]
 
 Suppose we do not have a real MIPS lui instruction. Instead, it is a pseudo-instruction of the form "lui $x, <16-bit const>", where "$x" is any of the valid registers (the assembler obtains the actual number) and the constant is 16-bit. We need to implement it using (the remaining) real MIPS instructions. The assembler uses a text rewriting process not unlike C macros. What you need to do is write a text template. Use "$x" and "<16-bit const>" to represent the target register and the 16-bit constant in the original lui that the assembler will use it to instantiate an instant from your template and replace the line where lui is in the code with the instance. Show what your template looks like. Don't worry about style, the solution is to test the concept – though you have to be clear in your description, and your assumptions has to be realistic. You do have to be careful that your code must work in all code circumstances and not compromise values in the registers.
@@ -652,6 +752,10 @@ ori $x, $zero, <16-bit const>
 sll $x, $x, 16                // shift it to the upper 16 bits
 ```
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Think of building the constant inside the register: load the 16 bits into the low half without sign extension, then shift them into the upper half.
+<!-- hint:end -->
 
 ## q27 [hard]
 
@@ -678,6 +782,10 @@ Number of I-type instructions in your design: 10
 Maximum total number of instructions: 4106 + 2 = 4108
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Start from the I-type constraint, which fixes the opcode width, then see what remains for the R-type fields once each register field grows to 6 bits.
+<!-- hint:end -->
+
 ## q28 [hard]
 
 Consider the MIPS datapath covered in class. For the MIPS instruction encoded as 0x10000103 fill in the corresponding elements in the boxes on the Answer Sheets. Use the notation $R to represent register number R, [$R] to represent the content of register number R and Mem(X) to represent the memory data at address X. Assume the PC value is 0x491 at the start.
@@ -697,3 +805,7 @@ New PC Value: 0x8A1
 Faster is to do it in binary. Instruction is: 0001 0000 0000 0000 0000 0001 0000 0011. The rest can be filled in based on this.
 The branch is taken, so new PC = PC + 4 + Immediate x 4 → 0x491 + 4 + 0x103 x 4 = 0x8A1
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Decode the opcode first to identify the instruction, then compute the branch target relative to PC+4. The immediate counts words, not bytes.
+<!-- hint:end -->

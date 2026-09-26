@@ -27,6 +27,9 @@ Step by step:
 
 Final `$t0 = 104`. (There is no `subi` instruction — `addi` with a negative immediate is how you subtract.)
 <!-- explanation:end -->
+<!-- hint:start -->
+Remember that `addi`'s immediate is a signed 16-bit value, so a negative immediate subtracts — and execution is strictly sequential.
+<!-- hint:end -->
 
 ## q2 [easy]
 
@@ -53,6 +56,9 @@ Sanity check by decoding back: `0000 0001 0110 1101 0100 0000 0010 0010` splits 
 
 Note the operand-order trap: the assembly is written `$rd, $rs, $rt` but the encoding is `$rs, $rt, $rd`.
 <!-- explanation:end -->
+<!-- hint:start -->
+Work out the R-format field order (`opcode | rs | rt | rd | shamt | funct`) first, and note the assembly operand order is `rd, rs, rt`.
+<!-- hint:end -->
 
 ## q3 [easy]
 
@@ -70,6 +76,9 @@ r0
 <!-- explanation:start -->
 `$zero` (register 0) is hard-wired to the constant value 0 and cannot be written. This makes it useful for register-to-register moves (`add $s0, $s1, $zero`) and as the "never equal" comparison operand. `$at` (1) is reserved for the assembler; `$k0`/`$k1` (26-27) are reserved for the OS.
 <!-- explanation:end -->
+<!-- hint:start -->
+Recall which register number is hard-wired to the constant 0 by the ISA, and what it is conventionally called.
+<!-- hint:end -->
 
 ## q4 [easy]
 
@@ -95,6 +104,9 @@ manual
 
 Summary: R = `opcode|rs|rt|rd|shamt|funct`; I = `opcode|rs|rt|immediate`; J = `opcode|immediate`. Branches and load/store are I-format; shifts are R-format; only `j` (and out-of-scope `jal`) is J-format.
 <!-- explanation:end -->
+<!-- hint:start -->
+Ask whether the instruction needs an immediate or constant field: that is what separates the three formats.
+<!-- hint:end -->
 
 ## q5 [easy]
 
@@ -112,6 +124,9 @@ ffffffce
 
 As a signed value this is -50, because `65536 - 50 = 65486 = 0xFFCE`. Contrast with a **logical** immediate (`andi`, `ori`, `xori`), which is bit-extended: `0xFFCE` would become `0x0000FFCE` (append zeros).
 <!-- explanation:end -->
+<!-- hint:start -->
+Sign extension copies the most significant bit of the 16-bit field into every upper bit — check whether that bit is 0 or 1.
+<!-- hint:end -->
 
 ## q6 [easy]
 
@@ -134,6 +149,9 @@ Little-endian stores the **least** significant byte at the lowest address:
 
 So `0x1001` holds `0xCD`. Note `lb $t0, 0($s0)` would load `0x000000EF`; `lb $t0, 1($s0)` loads `0x000000CD` — `lb` always loads into the **lower** byte and zeroes the upper three bytes.
 <!-- explanation:end -->
+<!-- hint:start -->
+Little-endian stores the least significant byte at the lowest address; unpack the word into bytes from there.
+<!-- hint:end -->
 
 ## q7 [easy]
 
@@ -159,6 +177,9 @@ numeric 0
 
 Final `$t0 = 12`. The lesson: a `beq` that is not taken costs one instruction but changes no register. If the snippet had used `bne`, `$t0` would have stayed 7.
 <!-- explanation:end -->
+<!-- hint:start -->
+A `beq` that is not taken simply falls through to the next instruction and changes no register — trace the comparison first.
+<!-- hint:end -->
 
 ## q8 [medium]
 
@@ -190,6 +211,9 @@ Final: **`$t0 = 32`** (which is `0x20`) and **`$s1 = 0`**.
 
 Extra checks: the loop body ran 4 times; `bne` was executed 4 times and branched 3 times; `sll $t0,$t0,1` is multiplication by 2 each time, so `$t0` went 2 → 4 → 8 → 16 → 32.
 <!-- explanation:end -->
+<!-- hint:start -->
+Track the loop counter and the shifting value through each iteration, and note when the `bne` finally stops branching.
+<!-- hint:end -->
 
 ## q9 [medium]
 
@@ -227,6 +251,9 @@ manual
 
 Final: **`$t8 = 30`** (the sum 4+5+6+7+8), **`$t1 = 20`**, **`$t9 = 20`** (unchanged). `$t0 = 0x10010014` and `$t2 = 8`.
 <!-- explanation:end -->
+<!-- hint:start -->
+Watch what each register is counting: one is a byte address, another stops at bytes consumed, so decide the units and exit condition first.
+<!-- hint:end -->
 
 ## q10 [medium]
 
@@ -255,6 +282,9 @@ exact
 
 Memory word at `0x2000` is now `0x00 FF 00 05` (bytes at 0x2003/0x2002/0x2001/0x2000) = **`0x00FF0005`**. `sb`/`lb` need no alignment, so offset 2 is legal; `sw` at `0x2000` is legal because the address is a multiple of 4.
 <!-- explanation:end -->
+<!-- hint:start -->
+Track the little-endian byte layout after the `sw`, then check which bytes the subsequent `lb` and `sb` actually touch.
+<!-- hint:end -->
 
 ## q11 [medium]
 
@@ -289,6 +319,9 @@ exact
 
 Final `$t2 = 0x00001133` (decimal 4403). The two loaded bytes are recombined but shifted relative to the original word, which is exactly the byte-level bookkeeping this question tests.
 <!-- explanation:end -->
+<!-- hint:start -->
+Build the constant in `$t1` first, then remember how `lb` zero-extends a byte before the adds and shift recombine them.
+<!-- hint:end -->
 
 ## q12 [medium]
 
@@ -314,6 +347,9 @@ Concatenate: `000000 10001 01010 01000 00000 101010`
 
 `slt` sets `$rd` to 1 when `$rs < $rt`, else 0. It is the real instruction behind the pseudo-branches `blt`, `bgt`, `ble` and `bge`, each of which expands to `slt` plus a `beq`/`bne`.
 <!-- explanation:end -->
+<!-- hint:start -->
+Use the R-format field order and the register numbers; `slt` is an R-format instruction with its own `funct` value.
+<!-- hint:end -->
 
 ## q13 [medium]
 
@@ -337,6 +373,9 @@ Because the target is **before** the current instruction (the branch goes backwa
 
 Diagram check: box from the line below the branch (`$PC+4`) up to the line above `Loop` and count the instructions inside — 31 of them, sign negative for a backward target. The immediate is a signed 16-bit 2's complement value, so -31 is well within range (-32768..32767).
 <!-- explanation:end -->
+<!-- hint:start -->
+Branch displacements are PC-relative and counted in words from `$PC + 4`; find the byte difference, divide by 4, and check the direction.
+<!-- hint:end -->
 
 ## q14 [medium]
 
@@ -357,6 +396,9 @@ Sanity check: `(0x00400024 & 0xF0000000) | (0x00100001 × 4) = 0x00000000 | 0x00
 
 The full instruction would encode as `000010` followed by the immediate = `00001000000100000000000000000001` = `0x08100001`.
 <!-- explanation:end -->
+<!-- hint:start -->
+J-format pseudo-direct addressing takes the top 4 bits from `$PC + 4` and stores the low 28 bits shifted right by 2.
+<!-- hint:end -->
 
 ## q15 [medium]
 
@@ -378,6 +420,9 @@ Check the encoding: `addi` opcode = 8 (`001000`), `$rs = $t1 = 9` (`01001`), `$r
 
 Also note the I-format operand-order trap: the assembly is `addi $rt, $rs, immediate`, and the encoding is `opcode | $rs | $rt | immediate`.
 <!-- explanation:end -->
+<!-- hint:start -->
+Remember that there is no immediate form of `sub`, but `addi` accepts a negative immediate — so ask how few instructions are really needed.
+<!-- hint:end -->
 
 ## q16 [medium]
 
@@ -411,6 +456,9 @@ numeric 0
 
 Final `$t0 = 18`, `$t1 = 9`. The loop body ran 3 times and the branch was taken once. `$t0` overshoots 10 because the test happens only after `$t1` (3, then 6, then 9) has been fully added.
 <!-- explanation:end -->
+<!-- hint:start -->
+`bge` is a pseudo-instruction expanding to `slt` plus a branch; trace it as a loop whose test happens after the addition.
+<!-- hint:end -->
 
 ## q17 [medium]
 
@@ -426,6 +474,9 @@ How far that reaches: MIPS instructions are word-aligned, so the low 2 bits of t
 
 Common trap: do not say ±2^15 bytes — that would be true only if the field were used as a raw byte offset, which MIPS deliberately avoids in order to branch 4 times farther.
 <!-- explanation:end -->
+<!-- hint:start -->
+The branch immediate is a signed 16-bit field measured in words, not bytes — work out the limits in words first.
+<!-- hint:end -->
 
 ## q18 [medium]
 
@@ -470,6 +521,9 @@ Exit:
 
 Marking notes: `sum = 0` must be done before the branch; the condition must be **inverted** for the "then" body (jump over the body when false); both branches must converge at `Exit`; `sum = n` is a register-to-register copy, correctly written as `add $s2, $s0, $zero` (or `addi $s2, $s0, 0`, or the pseudo `move $s2, $s0`).
 <!-- explanation:end -->
+<!-- hint:start -->
+For an if/else, invert the condition so the then-body is skipped when false, and make both arms converge at one exit label.
+<!-- hint:end -->
 
 ## q19 [hard]
 
@@ -491,6 +545,9 @@ manual
 
 (Not an error, but worth noting: `$s0` as a base register is legal; there is no rule reserving it.)
 <!-- explanation:end -->
+<!-- hint:start -->
+Check each line separately: one uses an opcode that does not exist, one violates an alignment rule, one exceeds an immediate field's range.
+<!-- hint:end -->
 
 ## q20 [hard]
 
@@ -514,6 +571,9 @@ Concatenate: `000100 10011 10100 1111111111111010`
 
 Verify: `($PC+4) + (imm×4) = 0x0040000C + (-6 × 4) = 0x0040000C - 0x18 = 0x003FFFF4`. Correct.
 <!-- explanation:end -->
+<!-- hint:start -->
+Handle part (a) with the PC-relative word offset, then lay out the I-format fields for part (b), sign-extending the immediate.
+<!-- hint:end -->
 
 ## q21 [hard]
 
@@ -538,6 +598,9 @@ The instruction is **`addi $t0, $t1, -4`**, i.e. `$t0 = $t1 + (-4) = $t1 - 4`.
 
 Immediate conversion: `0xFFFC` has MSB 1, so it is negative: `0xFFFC - 0x10000 = 65532 - 65536 = -4`. Remember that the opcode must be resolved **first** — only then do you know it is I-format and that the last 16 bits are a signed immediate rather than, say, `$rd | shamt | funct`.
 <!-- explanation:end -->
+<!-- hint:start -->
+Read the opcode first to decide the format, then split the remaining bits accordingly — for I-format the last 16 bits are a signed immediate.
+<!-- hint:end -->
 
 ## q22 [hard]
 
@@ -566,6 +629,9 @@ Double-check by re-encoding: `000000 00101 01001 00100 00000 100000` = `0000 000
 
 Two traps this question tests: (1) the field order is `$rs, $rt, $rd` while the assembly is written `$rd, $rs, $rt`; (2) `$rs = 5` is `$a1`, not `$t2` — `$t2` is 10 = `01010`, which would give `0x01492020`. Also note `funct = 0` with `$rs = 0` would mean `sll`, so the `funct` field must always be checked.
 <!-- explanation:end -->
+<!-- hint:start -->
+The top opcode says R-format, so use `opcode | rs | rt | rd | shamt | funct`; check `funct` to name the operation.
+<!-- hint:end -->
 
 ## q23 [hard]
 
@@ -588,6 +654,9 @@ Why this works: `lui` sets the upper 16 bits to the given constant and **clears 
 
 The three-instruction alternative follows the same idea: `ori $t0,$zero,0x1234`; `sll $t0,$t0,16`; `ori $t0,$t0,0xA5C0`. Full credit for either, provided no pseudo-instruction is used.
 <!-- explanation:end -->
+<!-- hint:start -->
+A 32-bit constant needs two steps: one for the upper half and one for the lower half, with the lower half's immediate treated as unsigned.
+<!-- hint:end -->
 
 ## q24 [hard]
 
@@ -625,6 +694,9 @@ Acceptable variants:
 
 Marking notes: the bound 8 must be materialised in a register (there is no branch-on-immediate); `i` must be initialised to 0 before the label; the loop must fall through to `Exit` exactly when `i == 8`. The final value of `$s0` is 16 after 8 iterations.
 <!-- explanation:end -->
+<!-- hint:start -->
+The bound cannot be a branch immediate, so it must live in a register; decide where the test sits and where the loop exits.
+<!-- hint:end -->
 
 ## q25 [hard]
 
@@ -660,3 +732,6 @@ Step by step:
 
 Contrast: `lh`/`sh` (halfword) are out of scope; `lb`/`sb` have no alignment requirement, which is why offset 2 is legal, whereas the `sw` at `0x3000` is legal only because `0x3000` is a multiple of 4.
 <!-- explanation:end -->
+<!-- hint:start -->
+Follow the word's little-endian byte layout, watch the logical shift, and remember `sb` stores only the low byte while `lb` zero-extends.
+<!-- hint:end -->

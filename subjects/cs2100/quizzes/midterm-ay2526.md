@@ -24,6 +24,10 @@ The value in 4-bit signed magnitude is -2₁₀.
 So is A.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Sign extension repeats the sign bit, not the value bits. First work out what 1010sm actually represents, then extend that sign.
+<!-- hint:end -->
+
 ## q2 [medium]
 
 Which of the following decimal values is not representable in a 9-bit binary signed magnitude representation?
@@ -42,6 +46,10 @@ Option C
 <!-- explanation:start -->
 Take away the MSB for sign bit, we have 8-bits for values that can range from 0x00 to 0xFF, i.e., 0 to 255. So the most positive representable would be +255 and the most negative representable would be -255.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+In signed magnitude one bit is reserved purely for the sign, so count how many bits are left for the magnitude before finding the range.
+<!-- hint:end -->
 
 ## q3 [medium]
 
@@ -64,6 +72,10 @@ B. Y = 4X, X + Y = 5X → works.
 C. Y = 8X, Y - X = 7X → does not work.
 D. Y = 2X, Z = 2X, X + Y + Z = 5X → works.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Write each option as a multiple of X: a left shift by k gives 2^k X, then check what the arithmetic combining them produces.
+<!-- hint:end -->
 
 ## q4 [medium]
 
@@ -106,6 +118,10 @@ D   4090₁₁ = 5423
 Hence the answer is D.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Each number must be legal in its own base (no digit may reach the base), then convert both sides to decimal and compare.
+<!-- hint:end -->
+
 ## q5 [medium]
 
 Which of the following is the 8-hexadecimal-digit hexadecimal string that represents the floating point value -1.0 (decimal) in the IEEE Standard 754 single precision (32-bit) floating point?
@@ -129,6 +145,10 @@ Putting it all together, we get
 1 | 011 1111 1 | 000 0000 0000 0000 0000 0000₂
 which is A.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Handle the three fields separately: sign, then the biased exponent for 2^0 (bias 127), then the mantissa bits of the magnitude.
+<!-- hint:end -->
 
 ## q6 [medium]
 
@@ -193,6 +213,10 @@ D+1 = 0x00a66d42 = 0000 0000 1010 0110 0110 1101 0100 0010₂
 The underlined bits are the 23 bits that make it into the mantissa, the bit in bold being the least significant one of these. You can see that the two values for B and B+1 results in the same 23 bits in the mantissa.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+The mantissa holds only 23 fraction bits, so ask how many significant bits apart two consecutive integers are before the extra bits get discarded.
+<!-- hint:end -->
+
 ## q7 [medium]
 
 Which of the following is a valid C initialization statement (i.e., no compilation warning or error and code will run accordingly)?
@@ -233,6 +257,10 @@ C initializes int x = 1, char s[3] = "abc" and leaves int y zero-filled – vali
 D supplies more initializers than there are members.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Check each initializer against the member it lands in, and remember that a string initializer also needs room for its terminating null.
+<!-- hint:end -->
+
 ## q8 [medium]
 
 Which of the following is a valid C if statement (i.e., no compilation warning or error, and the code will run accordingly), assuming the body of the loop (indicated as "...") is all good? We will assume that any variable referred to here is properly defined.
@@ -251,6 +279,10 @@ Option D
 <!-- explanation:start -->
 A has an empty condition, B and C contain a stray semicolon inside the parentheses, all of which are syntax errors. D is a valid conditional expression whose value (0 or 1) is a perfectly legal controlling expression.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+The controlling expression must be a complete expression; look for empty parentheses and stray semicolons inside them.
+<!-- hint:end -->
 
 ## q9 [medium]
 
@@ -282,6 +314,10 @@ Option A
 <!-- explanation:start -->
 i is incremented twice per iteration: once by the pre-increment inside the printf, and once by the loop's post-increment. i takes the values 0, 2, 4, 6, 8 at the top of the loop and prints 1, 3, 5, 7, 9; the next test 10 < 10 fails.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Careful: ++i in the printf body increments a second time. Count the increments per iteration.
+<!-- hint:end -->
 
 ## q10 [medium]
 
@@ -320,6 +356,10 @@ Second pass: print 3 (i becomes 2), then --i makes i = 1, loop again.
 Third pass: print 1 (i becomes 0), then --i makes i = -1, -1 is non-zero but i > 0 is false, so stop.
 Output: 5 3 1.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Track i after the printf's post-decrement and again after the --i in the condition before deciding whether to loop again.
+<!-- hint:end -->
 
 ## q11 [medium]
 
@@ -364,6 +404,10 @@ Option C
 Output: 1 100 3 4.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Decide what *q = &(A[1]) changes, then remember that in **q++ the ++ applies only after the dereference is used.
+<!-- hint:end -->
+
 ## q12 [medium]
 
 Consider the following C code:
@@ -406,6 +450,10 @@ Option B
 q is a pointer to a pointer. It's initial value is 0x5000 (address of p). In "**q++", q is incremented. So it will point to the second element of p, which in turn points to A[2] or 0x1008 due to the assignment of p[1] = &(A[2]);.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+After the post-increment, q points at the next element of p; follow the pointer stored there to the address it holds.
+<!-- hint:end -->
+
 ## q13 [medium]
 
 What is the hexadecimal encoding for the following instruction:
@@ -426,6 +474,10 @@ Option D
 <!-- explanation:start -->
 lw has opcode 0x23, rs = $t7 = 15, rt = $v1 = 3 and the immediate -100 is 0xFF9C in 16-bit two's complement. Encoding = 0x8DE30000 + 0xFF9C = 0x8DE3FF9C.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Assemble the fields separately: opcode, rs, rt, and the offset converted to 16-bit two's complement before combining the bytes.
+<!-- hint:end -->
 
 ## q14 [medium]
 
@@ -450,6 +502,10 @@ Option C
 0xfbad extended to 32-bit gives the constant -1107₁₀. Multiply this by 4, we get -4428₁₀ (-0x114c). Next we add this to PC+4, and we get 0x40bc.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+The 16-bit offset is a word offset: sign-extend it, shift left by 2, then add it to PC+4.
+<!-- hint:end -->
+
 ## q15 [medium]
 
 The "move" instruction is a pseudo-instruction. It moves the content of one register to another. Which of the following cannot be used to implement the following pseudo instruction that moves the content of register $r2 to register $r1 because for some inputs, it produces the wrong results?
@@ -470,6 +526,10 @@ Option B
 <!-- explanation:start -->
 This is because andi will do zero extension of the immediate. The upper half of $r1 will be zero'ed out.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Check what each candidate does to the upper bits of the destination, especially whether an immediate is sign- or zero-extended.
+<!-- hint:end -->
 
 ## q16 [medium]
 
@@ -494,6 +554,10 @@ Option A
 0x080000ad is j with a 26-bit address field of 0x0000ad; PC+4 = 0x1018 whose upper 4 bits are 0, so the jump target is 0x000000ad x 4 = 0x2B4.
 A beq $v0, $v0 always branches (a register always equals itself), and its target is PC + 4 + (-857 x 4) = 0x1018 - 0xD64 = 0x2B4 – the same target. Hence A.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Decode the jump target from the 26-bit field using the upper bits of PC+4, then find which branch lands on that same address.
+<!-- hint:end -->
 
 ## q17 [medium]
 
@@ -532,6 +596,10 @@ The problem with (i) is while the bit pattern is correct in $t1 (0x9200), the va
 Hence, "none of the above".
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Work out the required 32-bit pattern first (exactly bits 9, 12 and 15 set), then ask whether each sequence also leaves every other bit at 0.
+<!-- hint:end -->
+
 ## q18 [medium]
 
 A sender transmits a 32-bit word composed of 31 data bits followed by 1 odd parity bit. The parity is computed over all 31 data bits. The sender is big-endian and the receiver is little-endian. Assuming no transmission errors, which 32-bit data chunks, represented in hexadecimal, will be accepted without a parity error by the receiver?
@@ -554,6 +622,10 @@ Option C has 21 ones.
 Hence all satisfies odd parity.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Odd parity just needs the total number of ones to be odd; the sender/receiver endianness does not change that count.
+<!-- hint:end -->
+
 ## q19 [medium]
 
 What would be the main drawback of an aggressively designed expanding opcode scheme?
@@ -572,6 +644,10 @@ Option A
 <!-- explanation:start -->
 Each extra tier of opcode means the decoder has to inspect more fields and chain more decisions, so the decoding logic becomes complex.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Think about what the decoder must do as more opcode tiers are added, rather than about convenience for the programmer.
+<!-- hint:end -->
 
 ## q20 [medium]
 
@@ -602,6 +678,10 @@ Option A
 ❶ is the Read Addr 1 input of the register file, i.e. rs. rs is $v0 or register 2.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Identify which register-file port position 1 feeds and which instruction field supplies that register number for an R-type add.
+<!-- hint:end -->
+
 ## q21 [medium]
 
 Questions 20–25 use the following datapath diagram and these assumptions:
@@ -630,6 +710,10 @@ Option C
 <!-- explanation:start -->
 ❷ is the Read Addr 2 input of the register file, i.e. rt. rt is $s1 or register 17.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Position 2 is the second read port: work out which instruction field drives it and what its register number is.
+<!-- hint:end -->
 
 ## q22 [medium]
 
@@ -660,6 +744,10 @@ Option B
 ❸ is the Write Addr input of the register file, i.e. rd. rd is $t4 or register 12.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Position 3 is the write address: for an R-type add, check whether RegDst selects rd or rt.
+<!-- hint:end -->
+
 ## q23 [medium]
 
 Questions 20–25 use the following datapath diagram and these assumptions:
@@ -689,6 +777,10 @@ Option B
 ❹ is the output of the sign extend unit. The encoding for the instruction is 0x00516020. The lower 16 bit is fed into the sign extension unit and will produce 0x00006020 – which is then ignored by the ALU because ALUSrc will choose the second register ($s1) read from the register file instead.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+Take the lower 16 bits of the instruction encoding and sign-extend them; note this value is not modified by the ALU.
+<!-- hint:end -->
+
 ## q24 [medium]
 
 Questions 20–25 use the following datapath diagram and these assumptions:
@@ -717,6 +809,10 @@ Option D
 <!-- explanation:start -->
 The value of rt goes into the ALU as its second input. rt is $s1 = 0x300.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+With ALUSrc choosing the register operand, trace which register's value arrives at the ALU's second input.
+<!-- hint:end -->
 
 ## q25 [medium]
 
@@ -753,6 +849,10 @@ MemRead = MemWrite = 0 since there is no memory operation.
 MemtoReg = 0 so that the ALU output, not memory output, goes back to the register file for writing.
 <!-- explanation:end -->
 
+<!-- hint:start -->
+For an R-type add, ask which destination field is used, whether a register write is needed, and whether any memory access occurs.
+<!-- hint:end -->
+
 ## q26 [hard]
 
 As mentioned in Assignment 1, MIPS has a real instruction
@@ -786,6 +886,10 @@ OUT:
 ```
 <!-- explanation:end -->
 
+<!-- hint:start -->
+You need a loop shifting one position at a time, with a counter holding only the low 5 bits of $rz and a copy of $ry placed in $rx.
+<!-- hint:end -->
+
 ## q27 [hard]
 
 Suppose there is a machine that has 64 registers, and three types of instructions as follows:
@@ -810,6 +914,10 @@ Minimum number of instructions: 22
 
 4 Class B instruction (say binary opcode 0000 00 00₂ to 0000 00 11₂). 3 Class C instruction (0000 01₂ to 0000 11₂) and 15 Class A, i.e., 0001₂ to 1111₂. So the minimum is 4 + 3 + 15 = 22.
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Class A is only 16 bits, so its opcode space nests inside the first 16 bits of the 32-bit classes; compare how many distinct opcodes each class needs.
+<!-- hint:end -->
 
 ## q28 [hard]
 
@@ -847,3 +955,7 @@ Total latency = 400 (Inst-Mem) + 200 (Reg-File) + 120 (ALU) + 30 (MtoR) + 200 (R
 
 Total latency: 950ps
 <!-- explanation:end -->
+
+<!-- hint:start -->
+Trace the addi path (fetch, register read, ALU, write-back) and check which units lie off that path or run in parallel with it.
+<!-- hint:end -->

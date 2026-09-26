@@ -17,6 +17,10 @@ Value = 1×2⁶ + 1×2⁵ + 0×2⁴ + 1×2³ + 0×2² + 0×2¹ + 1×2⁰ + 0×2�
 = 64 + 32 + 0 + 8 + 0 + 0 + 1 + 0 + 0.25 + 0.125 + 0 = 105.375.
 Check: 105.375 in binary is 1101001.011 (trailing 0 added to match the given 4 fraction bits).
 <!-- explanation:end -->
+<!-- hint:start -->
+Work out each bit's weight as a power of 2 — positive powers left of the dot, negative powers right of it — then add only the weights whose bit is 1.
+<!-- hint:end -->
+
 
 ## q2 [medium]
 
@@ -33,6 +37,10 @@ Fraction 0.6875, repeated multiplication by 2 (append each truncated whole part)
 Answer: (101011.1011)₂.
 Verification: 101011₂ = 32+8+2+1 = 43; 0.1011₂ = 0.5+0.125+0.0625 = 0.6875. Total 43.6875. Correct.
 <!-- explanation:end -->
+<!-- hint:start -->
+Handle the parts separately: divide the whole part by 2 repeatedly, reading remainders bottom-up, and multiply the fraction by 2 repeatedly, reading the whole-number digits top-down.
+<!-- hint:end -->
+
 
 ## q3 [medium]
 
@@ -45,6 +53,10 @@ manual
 Sequence: 0.1×2 = 0.2 (digit 0); 0.2×2 = 0.4 (0); 0.4×2 = 0.8 (0); 0.8×2 = 1.6 (1, fraction 0.6); 0.6×2 = 1.2 (1, fraction 0.2) — and 0.2 has been seen before, so the state 0.2 → 0.4 → 0.8 → 0.6 → 0.2 cycles forever. Because the algorithm is deterministic, once a `num` value repeats the algorithm can never reach 0, so the binary expansion of 0.1 is non-terminating and the 4-step cycle 0.2 → 0.4 → 0.8 → 0.6 repeats forever.
 The notes' termination rule: limit the fraction to at most 10 digits, accepting an approximation. (Equivalently, stop when the required precision is reached.) Note the whole-part algorithm always terminates at quotient 0; only the fractional algorithm can fail to terminate.
 <!-- explanation:end -->
+<!-- hint:start -->
+Multiply by 2 repeatedly and track the leftover fraction after each step; if a leftover value you have already seen comes back, the loop can never reach zero. Then apply the notes' precision limit.
+<!-- hint:end -->
+
 
 ## q4 [easy]
 
@@ -60,6 +72,10 @@ Weights are powers of 8, dot after position 0: 6×8³ + 2×8² + 0×8¹ + 4×8�
 = 6×512 + 2×64 + 0 + 4 + 1/8 + 2/64 = 3072 + 128 + 4 + 0.125 + 0.03125 = 3204.15625.
 Note: the source's printed "Steps" line shows (6224.12)₈, which is a typo — the terms it evaluates correspond to 6204.
 <!-- explanation:end -->
+<!-- hint:start -->
+Expand using weights that are powers of 8, treating the digit just right of the dot as the 8⁻¹ place and the next as 8⁻², then sum all the terms.
+<!-- hint:end -->
+
 
 ## q5 [medium]
 
@@ -81,6 +97,10 @@ Answer: **(595.4A)₁₆** (note the fraction pads to `0100 1010`, not `0100 100
 
 Verification of the fractional part: 224₈ = 2/8 + 2/64 + 4/512 = 0.25 + 0.03125 + 0.0078125 = 0.2890625, and 4A₁₆ = 4/16 + 10/256 = 0.25 + 0.0390625 = 0.2890625. Both agree, and the whole numbers are 1429 in both bases (2625₈ = 2×512+6×64+2×8+5 = 1429; 595₁₆ = 5×256+9×16+5 = 1429). Since 3 and 4 are both powers of 2, going through binary in either direction is valid.
 <!-- explanation:end -->
+<!-- hint:start -->
+Group outward from the binary point — 3 bits per octal digit, 4 per hex digit — padding the outer groups with zeros so every group is full.
+<!-- hint:end -->
+
 
 ## q6 [medium]
 
@@ -98,6 +118,10 @@ Regroup into 4-bit nibbles from the right: 1110 1110 0101 → E, E, 5. Leading z
 Answer: **(EE5)₁₆**.
 Verification: 7345₈ = 7×512 + 3×64 + 4×8 + 5 = 3584 + 192 + 32 + 5 = 3813. EE5₁₆ = 14×256 + 14×16 + 5 = 3584 + 224 + 5 = 3813. ✓
 <!-- explanation:end -->
+<!-- hint:start -->
+Each octal digit expands to exactly 3 bits; for the hex conversion, regroup the resulting whole bit string into 4-bit nibbles starting from the right.
+<!-- hint:end -->
+
 
 ## q7 [medium]
 
@@ -113,6 +137,10 @@ So (CA.FE)₁₆ = **(3022.3332)₄**.
 Verification: 3022.3332₄ = 3×64 + 0 + 2×4 + 2 + 3/4 + 3/16 + 3/64 + 2/256 = 192+8+2 + 0.75+0.1875+0.046875+0.0078125 = 202.9921875, which equals CA.FE₁₆ = 192+10+0.9375+0.0546875 = 202.9921875. ✓
 Alternative route: CA.FE = 1100 1010 . 1111 1110, regroup as 11 00 10 10 . 11 11 11 10 = 3 0 2 2 . 3 3 3 2.
 <!-- explanation:end -->
+<!-- hint:start -->
+Compare the two bases first: one hex digit maps to a whole number of base-4 digits, so expand each hex digit to binary and regroup the bits in pairs from the point.
+<!-- hint:end -->
+
 
 ## q8 [easy]
 
@@ -129,6 +157,10 @@ A digit d requires base > d, so the base must exceed the largest digit present, 
 (2100)₃ = 2×3³ + 1×3² + 0×3¹ + 0×3⁰ = 2×27 + 1×9 = 54 + 9 = **63**.
 (Related exercise from the notes, for contrast: the largest base whose value stays ≤ 1000 is 7, since (2100)₇ = 2×343 + 1×49 = 735 but (2100)₈ = 2×512 + 1×64 = 1088.)
 <!-- explanation:end -->
+<!-- hint:start -->
+The base must be strictly greater than every digit appearing in the string; find the largest digit present, then evaluate the string with that base's positional weights.
+<!-- hint:end -->
+
 
 ## q9 [medium]
 
@@ -150,6 +182,10 @@ Remainders in order: 0, 1, 2, 2, 1, 2, 2. Reading from last to first (bottom-up)
 The last remainder produced (2) is the most significant digit (MSB); the first remainder produced (0) is the least significant digit (LSB).
 Verification: 2×729 + 2×243 + 1×81 + 2×27 + 2×9 + 1×3 + 0 = 1458+486+81+54+18+3+0 = 2100. ✓
 <!-- explanation:end -->
+<!-- hint:start -->
+Divide repeatedly by 3, recording every remainder, and stop only when the quotient reaches zero; the remainders are read in reverse order of production.
+<!-- hint:end -->
+
 
 ## q10 [easy]
 
@@ -167,6 +203,10 @@ In sign-and-magnitude the left-most bit is the sign (1 = negative) and the remai
 `1001`: sign 1 (negative), magnitude 001₂ = 1 ⇒ **−1**.
 (Note `1000` in sign-and-magnitude is −0, which is a second representation of zero.)
 <!-- explanation:end -->
+<!-- hint:start -->
+For sign-and-magnitude, split each pattern into a sign bit and the remaining magnitude bits, then apply the sign to the magnitude value.
+<!-- hint:end -->
+
 
 ## q11 [hard]
 
@@ -180,6 +220,10 @@ manual
 Decoding `0110` in sign-and-magnitude: sign 0 (positive), magnitude 110₂ = 6 ⇒ **+6**, but the correct answer is −6. So the claim is **false**: sign-and-magnitude addition requires sign logic (add magnitudes when signs agree, subtract the smaller magnitude from the larger and take the larger's sign when they differ), not plain binary addition. This is exactly why sign-and-magnitude is listed as "-" (too complex) for addition in the operations summary.
 Correct answer for (−5) + (−1) should be the pattern for −6, i.e. `1110`.
 <!-- explanation:end -->
+<!-- hint:start -->
+Treat the two 4-bit patterns as plain unsigned binary and add them, keeping only the low 4 bits, then decode that result in sign-and-magnitude and compare with the true sum.
+<!-- hint:end -->
+
 
 ## q12 [hard]
 
@@ -193,6 +237,10 @@ manual
 (b) Yes. −2048 is exactly the smallest value, whose pattern is `1000 0000 0000` (a 1 followed by eleven 0s). It is representable only because 2s complement drops the redundant −0: the codeword that would be −0 is reassigned to −2048.
 (c) 2012 ≤ 2047 and ≥ −2048, so it is representable. Check: 2012 = 1024 + 512 + 256 + 128 + 64 + 16 + 8 + 4 = 11111011100₂ (11 bits); padded to 12 bits with a leading 0: `0111 1101 1100`.
 <!-- explanation:end -->
+<!-- hint:start -->
+Recall the n-bit 2s complement bounds from the weight of the sign bit, and note that the all-sign-bit-one codeword is a genuine value rather than a second zero.
+<!-- hint:end -->
+
 
 ## q13 [medium]
 
@@ -206,6 +254,10 @@ manual
 (b) 4 = `0100`, −7 = `1001`. Raw sum: `0100` + `1001` = `1101`. `1101` decodes as −8 + 4 + 1 = **−3**, which is the correct value (4 + (−7) = −3). The operands have different signs, so overflow can never occur here. **No overflow.**
 Rule used: overflow is only possible when both operands share a sign bit; it has occurred iff the result's sign bit differs from theirs.
 <!-- explanation:end -->
+<!-- hint:start -->
+Add the patterns and keep 4 bits, then compare the carry into the sign bit with the carry out of it; overflow also requires both operands to share a sign and the result to differ.
+<!-- hint:end -->
+
 
 ## q14 [medium]
 
@@ -219,6 +271,10 @@ manual
 (b) −6 = `1010`, +3 = `0011`. Raw sum `1010` + `0011` = `1101`; no truncation needed. `1101` decodes to −8 + 4 + 1 = **−3**, correct (−6 + 3 = −3). Again the operands have different signs ⇒ **no overflow**.
 General rule: overflow requires both operands to share a sign bit and the result to have the opposite sign; a different-sign addition can never overflow.
 <!-- explanation:end -->
+<!-- hint:start -->
+Add the patterns and truncate to 4 bits; a carry out of the sign bit is not itself an overflow, and only same-sign operands can overflow.
+<!-- hint:end -->
+
 
 ## q15 [medium]
 
@@ -232,6 +288,10 @@ The 4-bit 1s complement range is −7…+7, so 3 + 5 = 8 is outside the range an
 Contrast: (−2) + (−5) = −7, which is representable. −2 = `1101`, −5 = `1010`; raw sum `1101` + `1010` = `10111`, which needs 5 bits, so the end-around carry applies: drop the carry, keep `0111`, then add 1 ⇒ `1000`, which decodes to **−7**. Both operands are negative and the final result is negative ⇒ **no overflow**.
 Procedure summary: add; if the raw sum needs n+1 bits, add the carry back in (end-around carry); truncate to n bits; then check overflow by comparing result sign with operand signs.
 <!-- explanation:end -->
+<!-- hint:start -->
+Add in 1s complement and, if the sum needs a fifth bit, add that end-around carry back into the least significant bit; then compare the result's sign with the operands'.
+<!-- hint:end -->
+
 
 ## q16 [easy]
 
@@ -247,6 +307,10 @@ In Excess-N the value of a pattern is its unsigned binary value minus N.
 (c) The codewords `0000`…`1111` have unsigned values 0…15, so the values are −8…+7 ⇒ range **−8 to +7**.
 (d) Excess-8 maps the pattern `1000` to 0. The negatives are `0000`…`0111` (−8…−1, eight values) and the non-negatives are `1000`…`1111` (0…+7, eight values). The source's general rule for an even split is N = 2ⁿ⁻¹ = 2³ = 8 for n = 4 bits (giving −2ⁿ⁻¹ … 2ⁿ⁻¹−1). Using N = 7 instead would give −7…+8, which favours positives; the source notes that off-by-one choice is usually acceptable, and that IEEE 754 uses the 2ⁿ⁻¹−1 form for exponents.
 <!-- explanation:end -->
+<!-- hint:start -->
+The stored pattern is the true value plus the offset N, so decoding subtracts N and encoding adds it; check how the codeword range divides around zero.
+<!-- hint:end -->
+
 
 ## q17 [medium]
 
@@ -262,6 +326,10 @@ manual
 (d) Excess-8: unsigned 8 ⇒ 8 − 8 = **0**.
 This one pattern therefore means −0, −7, −8 and 0 respectively — a good reminder that a bit pattern is meaningless without stating the representation.
 <!-- explanation:end -->
+<!-- hint:start -->
+Read the same pattern under each scheme: sign-and-magnitude and the complements interpret the top bit differently, while Excess-8 is just an offset on the unsigned value.
+<!-- hint:end -->
+
 
 ## q18 [hard]
 
@@ -279,6 +347,10 @@ First, 55₁₀ = 32 + 16 + 4 + 2 + 1 = `00110111` in 8 bits.
 Final answers: (a) `10110111`, (b) `11001000`, (c) `11001001`, (d) `01001001`.
 Cross-check the three complement forms are consistent: 1s complement is the bit-flip of the positive magnitude, and 2s complement is the 1s pattern plus 1 (`11001000` + 1 = `11001001`).
 <!-- explanation:end -->
+<!-- hint:start -->
+Start by writing the positive magnitude in 8 bits, then derive each form from it — set the sign bit, invert all bits, invert and add one, and add the bias for the excess form.
+<!-- hint:end -->
+
 
 ## q19 [easy]
 
@@ -294,6 +366,10 @@ First, 5₁₀ = `0101` in 4 bits.
 (c) Excess-8: the pattern's unsigned value must be 5 less than 8, i.e. 8 − 5 = 3 = `0011`. So **`0011`**. Check: 3 − 8 = −5. ✓
 Note (a) and (b) differ by exactly one in magnitude, which is the shift caused by removing the redundant −0.
 <!-- explanation:end -->
+<!-- hint:start -->
+Write the positive magnitude in 4 bits first, then apply each scheme's negation rule to that pattern.
+<!-- hint:end -->
+
 
 ## q20 [easy]
 
@@ -308,6 +384,10 @@ manual
 (c) Truncation keeps the whole-number multiple: ⌊232.96⌋ = 232, and 232 × 0.015625 = **3.625**.
 (d) Error = 3.64 − 3.625 = **0.015** (the truncated value is below the true value by 0.015). Note the maximum truncation error for this format is 0.015625 (one whole resolution step), and the notes state that truncation is the usual practical policy.
 <!-- explanation:end -->
+<!-- hint:start -->
+The resolution is the weight of the least significant fraction bit; test exact representability by dividing the value by the resolution and seeing whether the quotient is a whole number.
+<!-- hint:end -->
+
 
 ## q21 [hard]
 
@@ -323,6 +403,10 @@ So the positive pattern is `0000100100.000010`.
 Step 3 — negate in 1s complement by inverting all bits: `1111011011.111101`.
 Final answer: **1111011011.111101₁s**. (Cross-check with the formula −x = 2ⁿ − x − 2⁻ᶠ = 1024 − 36.03125 − 0.015625 = 987.953125; and 1111011011.111101₂ = 987 + 0.953125 = 987.953125 ✓.)
 <!-- explanation:end -->
+<!-- hint:start -->
+Build the positive fixed-point pattern first: convert the magnitude, pad the whole field and the fraction field to their required widths, then negate by inverting every bit.
+<!-- hint:end -->
+
 
 ## q22 [medium]
 
@@ -341,6 +425,10 @@ Concatenate: 1 | 10000001 | 10100000000000000000000.
 Group into nibbles: 1100 0001 1101 0000 0000 0000 0000 0000 = C 0 D 0 0 0 0 0.
 Final answer: **0xC0D00000**. (The leading 1 of 1.101 is the hidden bit and is not stored.)
 <!-- explanation:end -->
+<!-- hint:start -->
+Convert the magnitude to binary, shift the point so exactly one 1 sits before it, then bias the exponent and store the fraction bits with the leading 1 omitted.
+<!-- hint:end -->
+
 
 ## q23 [hard]
 
@@ -357,6 +445,10 @@ Mantissa: restore the hidden bit ⇒ 1.01000000000000000000000₂ = 1 + 0×2⁻�
 Value = (−1)^0 × 1.25 × 2⁴ = 1.25 × 16 = **20.0**.
 Check by direct encoding: 20 = 10100₂ = 1.01₂ × 2⁴; exponent stored = 4 + 127 = 131 = `10000011`; mantissa = `010…0`; sign 0. ✓
 <!-- explanation:end -->
+<!-- hint:start -->
+Split the 32-bit pattern into sign, exponent and mantissa fields, undo the bias on the exponent, and remember to put the implicit leading 1 back before multiplying.
+<!-- hint:end -->
+
 
 ## q24 [hard]
 
@@ -369,3 +461,7 @@ manual
 (a) Normalising means shifting the binary point until there is exactly one non-zero digit in front of it. In binary there are only two symbols, 0 and 1, so a non-zero normalised mantissa must begin with 1 — there is no other possibility (anything of the form 0._ would be denormalised/zero). Therefore the leading 1 can be *assumed* rather than stored, gaining one bit of precision for free. In decimal there are nine possible non-zero leading digits (1–9), so a decimal normalised mantissa of the form "d.xxxx" would still need to record d; the trick does not apply.
 (b) The normalised form is defined to be 1.<fraction>; the value 0 has no leading 1 (and no exponent that makes it non-zero), so it cannot be written in normalised form. IEEE 754 therefore reserves the all-zero exponent field (with an all-zero mantissa) as a special case meaning ±0 (and uses other reserved exponent values for denormals, infinity and NaN). The lecture notes cover the normalised-mantissa and Excess-exponent mechanics but do not spell out these special-case encodings.
 <!-- explanation:end -->
+<!-- hint:start -->
+Compare how many possible leading digits a normalised mantissa has in base 2 versus base 10, and ask whether a form like 1.xxx can ever produce a value of zero.
+<!-- hint:end -->
+

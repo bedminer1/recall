@@ -32,6 +32,17 @@ Open the attempt file it prints, write your answer inside the `<!-- response:sta
 recall submit cs2100/a001 q7
 ```
 
+## Somewhere to think
+
+Every attempt gives you two places to write that grading never reads:
+
+- **`Working notes`** at the top of the attempt, for shortcuts and traps worth remembering across the whole paper — *"leading hex digit 8-F means negative"*, *"the branch offset counts from PC+4, in words"*.
+- **A `notes` area directly above each answer**, for your working: the reasoning you'd otherwise lose, the options you ruled out, where you got stuck. Work up there, then write the answer underneath.
+
+Both sit inside `<!-- notes:start -->` / `<!-- notes:end -->` markers. Nothing reads them, nothing overwrites them, and no marker counts as your answer — only the `response` block does. Write as much as you like, and keep it after the question is marked so the next visit to that question starts from your own notes.
+
+The `feedback` block is the tool's side (hints and explanations land there), but if you write in it anyway nothing is lost — the tool appends rather than replaces.
+
 The attempt is written `subject/attempt-id` because every subject numbers its attempts from `a001` — with `cs4243` in the same repo, a bare `a001` is ambiguous and Recall will list the candidates instead of guessing.
 
 You get the verdict immediately, then just three numbers: your accuracy across cs2100, your accuracy on that quiz, and the LP left to your next rank.
@@ -51,16 +62,35 @@ You get the verdict immediately, then just three numbers: your accuracy across c
       edit it, then:  recall submit cs2100/a002 q13
 ```
 
-Nudges are mechanical, so they never give the answer away: numbers get *too low* / *too high* / *so close, check your rounding*; short answers get *so close, check the formatting*, or on a third miss the length and first character; multi-part answers get *you have 2 of 3 required ideas*. Edit the response in the attempt file and submit again as many times as you like. A blank response isn't an attempt either, so leaving something unanswered costs nothing.
+Every question in the cs2100 quizzes carries its own written hint, which is what you see the first time you get it wrong. It names the concept, the step or the trap without giving the answer away — for example *"the top 4 bits come from PC+4, not from the target, so work out PC+4 first"*. Edit your response in the attempt file and submit again as many times as you like. A blank response isn't an attempt either, so leaving something untouched costs nothing.
+
+If a quiz has no authored hint, Recall falls back to a mechanical one derived from the grading rule: numbers get *too low* / *too high* / *so close, check your rounding*, short answers get *so close, check the formatting*, and multi-part answers get *you have 2 of 3 required ideas*.
 
 If you're truly stuck, `recall giveup cs2100/a002 q13` shows the worked explanation and takes the miss.
 
-You can also grade several at once:
+## One command, no argument to update
 
 ```sh
-recall submit cs2100/a002 q11 q12 q13    # just those three
-recall submit cs2100/a002                # whatever is still outstanding
+recall submit cs2100/a002
 ```
+
+With no question id this grades **every question you have answered that has no verdict yet**. So the rhythm is: write answers for as many questions as you like, then hit up-arrow and enter — the same command every time, nothing to retype. It gives a verdict and a hint per question, then one aggregate line:
+
+```
+  [+] q2  +15 LP
+  [~] q3  Two tens.   -20 LP
+      edit it, then:  recall submit cs2100/a002 q3
+  [+] q4  +10 LP   (try 2, after -20 LP)
+
+  this run  +5 LP   2 correct   1 to retry   0 missed
+  cs2100            50%  (2/4)   all quizzes
+  midterm-ay2425    50%  (2/4)   this quiz
+  Iron IV          35 LP to Iron III   (grade D)
+```
+
+A question left blank simply waits — it never blocks the ones after it, so you can skip a question and come back to it. A question still open from a previous round is picked up again automatically, and re-grading an identical answer never charges the penalty twice. Settled questions are skipped, so you never re-grade what you already finished.
+
+If you want to grade specific questions, name them: `recall submit cs2100/a002 q11 q12 q13`.
 
 ## Free-response questions
 
@@ -82,15 +112,19 @@ Marking is honest either way, and nothing is scored twice.
 
 ## Points and progress
 
-Every correct answer earns **LP**, and LP is what sets your rank for that subject. The base is **15 easy / 20 medium / 30 hard**, and **every retry halves it, floored**:
+Every correct answer earns **LP**, and LP is what sets your rank for that subject. The base is **20 easy / 30 medium / 40 hard**, and **every retry halves it, floored**:
 
-| Difficulty | 1st try | 2nd try | 3rd try | 4th try | 5th try | miss |
-|---|---|---|---|---|---|---|
-| easy | +15 | +7 | +3 | +1 | 0 | -7 |
-| medium | +20 | +10 | +5 | +2 | +1 | -10 |
-| hard | +30 | +15 | +7 | +3 | +1 | -15 |
+| Difficulty | 1st try | 2nd try | 3rd try | 4th try | 5th try |
+|---|---|---|---|---|---|
+| easy | +20 | +10 | +5 | +2 | +1 |
+| medium | +30 | +15 | +7 | +3 | +1 |
+| hard | +40 | +20 | +10 | +5 | +2 |
 
-A retry always beats giving up, but a miss costs half the question's value, so ranks can fall as well as rise.
+Getting a question wrong costs a flat **-20 LP, charged on every wrong attempt**, on top of the halved reward if you later redeem it. So a medium question answered wrong then right nets `-20 + 15 = -5`: retrying still beats giving up, but a first-try answer is where the value is.
+
+A blank response is not an attempt, so leaving a question untouched costs nothing.
+
+**Accuracy counts the first attempt only.** Once you get a question wrong the first time it is a loss on the record, even if you then redeem it — the retry is for the LP, not for the accuracy. `progress.md` keeps both: a `wrong` row per failed attempt, and one final `correct`/`incorrect` row per question.
 
 ## Ranks
 
